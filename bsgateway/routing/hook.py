@@ -46,7 +46,7 @@ def load_routing_config(config_path: str | None = None) -> RoutingConfig:
     so that adding a model only requires editing one place.
     """
     path = config_path or os.environ.get(
-        "GATEWAY_CONFIG_PATH", "config/gateway.yaml"
+        "GATEWAY_CONFIG_PATH", "gateway.yaml"
     )
     try:
         with open(path) as f:

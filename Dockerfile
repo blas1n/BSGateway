@@ -14,8 +14,8 @@ RUN uv pip install --system .
 COPY . .
 
 ENV PYTHONPATH=/app
-ENV GATEWAY_CONFIG_PATH=/app/config/gateway.yaml
+ENV GATEWAY_CONFIG_PATH=/app/gateway.yaml
 
 EXPOSE 4000
 
-CMD ["litellm", "--config", "config/gateway.yaml", "--port", "4000", "--num_workers", "4"]
+CMD ["litellm", "--config", "gateway.yaml", "--port", "4000", "--num_workers", "4"]

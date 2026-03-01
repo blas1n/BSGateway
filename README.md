@@ -45,7 +45,7 @@ The gateway starts on `http://localhost:4000`.
 
 ## Configuration
 
-Single file: `config/gateway.yaml`
+Single file: `gateway.yaml`
 
 - **Add a model**: add to `model_list` - routing auto-recognizes it as passthrough
 - **Add an alias**: add to `routing.aliases`

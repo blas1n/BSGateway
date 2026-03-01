@@ -7,7 +7,7 @@ services:
       - "${GATEWAY_PORT:-4000}:4000"
     env_file: .env
     environment:
-      - GATEWAY_CONFIG_PATH=/app/config/gateway.yaml
+      - GATEWAY_CONFIG_PATH=/app/gateway.yaml
       - PYTHONPATH=/app
     depends_on:
       postgres:

@@ -24,7 +24,7 @@ docker compose up
 
 - **LiteLLM Proxy** handles OpenAI/Anthropic API compatibility
 - **BSGateway hook** (`bsgateway/routing/hook.py`) intercepts via `async_pre_call_hook`
-- **Single config** (`config/gateway.yaml`) defines both LiteLLM models and routing rules
+- **Single config** (`gateway.yaml`) defines both LiteLLM models and routing rules
 - `passthrough_models` are auto-derived from `model_list[].model_name` - no manual list needed
 - **Classifier strategies**: `static` (heuristic), `llm` (Ollama), `ml` (sklearn stub)
 - **Data collection**: PostgreSQL via asyncpg, SQL in `.sql` files (not ORM)
@@ -43,7 +43,7 @@ docker compose up
 
 | File | Purpose |
 |------|---------|
-| `config/gateway.yaml` | Single source of truth for models + routing |
+| `gateway.yaml` | Single source of truth for models + routing |
 | `bsgateway/routing/hook.py` | Config loader, BSGatewayRouter, LiteLLM callback |
 | `bsgateway/routing/models.py` | All dataclasses (TierConfig, RoutingDecision, etc.) |
 | `bsgateway/routing/collector.py` | PostgreSQL data collection (asyncpg pool) |

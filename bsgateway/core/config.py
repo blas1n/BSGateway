@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     local_llm_model: str = "llama3"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    gateway_config_path: Path = Path("config/gateway.yaml")
+    gateway_config_path: Path = Path("gateway.yaml")
     database_url: str | None = None
     redis_host: str = "redis"
     redis_port: int = 6379

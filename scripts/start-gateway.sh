@@ -15,7 +15,7 @@ if [ ! -f ".env" ]; then
 fi
 
 # Export config path for the custom hook
-export GATEWAY_CONFIG_PATH="${GATEWAY_CONFIG_PATH:-config/gateway.yaml}"
+export GATEWAY_CONFIG_PATH="${GATEWAY_CONFIG_PATH:-gateway.yaml}"
 export PYTHONPATH="${PYTHONPATH:-.}"
 
 # Start LiteLLM proxy with unified config
