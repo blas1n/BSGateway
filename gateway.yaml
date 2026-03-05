@@ -39,7 +39,8 @@ model_list:
 
 # === LiteLLM Settings ===
 litellm_settings:
-  callbacks: bsgateway.routing.hook.proxy_handler_instance
+  callbacks:
+    - bsgateway.routing.hook.proxy_handler_instance
   drop_params: true
   num_retries: 2
   request_timeout: 120
@@ -51,7 +52,6 @@ router_settings:
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
-  database_url: "os.environ/DATABASE_URL"
 
 # === BSGateway Routing ===
 # LiteLLM ignores this section; only our hook reads it.

@@ -165,12 +165,12 @@ class BSGatewayRouter:
         if self.config.collector.enabled:
             from bsgateway.core.config import settings
 
-            if settings.database_url is None:
-                logger.warning("collector_disabled", reason="database_url not set")
+            if settings.collector_database_url is None:
+                logger.warning("collector_disabled", reason="collector_database_url not set")
                 self.collector = None
             else:
                 self.collector: RoutingCollector | None = RoutingCollector(
-                    database_url=settings.database_url,
+                    database_url=settings.collector_database_url,
                     embedding_config=self.config.collector.embedding,
                 )
         else:

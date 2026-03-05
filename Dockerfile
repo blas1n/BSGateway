@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 COPY pyproject.toml .
+COPY bsgateway/__init__.py bsgateway/__init__.py
 RUN uv pip install --system .
 
 COPY . .

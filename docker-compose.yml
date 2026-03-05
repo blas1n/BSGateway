@@ -1,5 +1,12 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   gateway:
+    logging: *default-logging
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,7 +23,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -24,6 +31,7 @@ services:
       - bsgateway
 
   postgres:
+    logging: *default-logging
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-bsgateway}
@@ -41,6 +49,7 @@ services:
       - bsgateway
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     restart: unless-stopped
     healthcheck:
