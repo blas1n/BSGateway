@@ -26,7 +26,7 @@ services:
     command: >
       sh -c "zsh && sudo /usr/local/bin/init-firewall.sh"
     ports:
-      - "4000:4000"
+      - "${EXTERNAL_BACKEND_PORT:-4000}:4000"
     networks:
       - bsage-network
 
