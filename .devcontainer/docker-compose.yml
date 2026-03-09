@@ -13,12 +13,11 @@ services:
     volumes:
       - ..:/workspace:cached
       - claude-code-bashhistory:/commandhistory
-      - claude-code-config:/home/vscode/.claude
+      - ~/.claude:/home/vscode/.claude:cached
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - ENVIRONMENT=development
-      - CLAUDE_CONFIG_DIR=/home/vscode/.claude
       - LANG=C.UTF-8
       - LC_ALL=C.UTF-8
     stdin_open: true
@@ -58,7 +57,6 @@ services:
 
 volumes:
   claude-code-bashhistory:
-  claude-code-config:
   postgres_data:
 
 networks:
