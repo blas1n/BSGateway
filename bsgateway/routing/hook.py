@@ -9,7 +9,6 @@ import structlog
 import yaml
 
 from bsgateway.routing.classifiers import ClassifierProtocol, create_classifier
-from bsgateway.routing.classifiers.base import ClassificationResult
 from bsgateway.routing.collector import RoutingCollector
 from bsgateway.routing.models import (
     ClassifierConfig,
