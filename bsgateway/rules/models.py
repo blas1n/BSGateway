@@ -10,6 +10,36 @@ from bsgateway.routing.classifiers.base import (
     extract_user_text,
 )
 
+# CJK Unicode ranges for language detection
+_CJK_RE = re.compile(r"[\u3000-\u9fff\uac00-\ud7af\u3040-\u309f\u30a0-\u30ff]")
+_HANGUL_RE = re.compile(r"[\uac00-\ud7af\u3131-\u3163]")
+_KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+_CJK_IDEO_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _detect_language(text: str) -> str | None:
+    """Simple heuristic language detection.
+
+    Returns ISO 639-1 code or None if undetermined.
+    Only detects ko, ja, zh, en for now — enough for routing decisions.
+    """
+    if not text:
+        return None
+    # Count script-specific characters
+    hangul = len(_HANGUL_RE.findall(text))
+    kana = len(_KANA_RE.findall(text))
+    cjk_ideo = len(_CJK_IDEO_RE.findall(text))
+    total_cjk = hangul + kana + cjk_ideo
+    if total_cjk == 0:
+        return "en"  # Default to English for Latin/ASCII text
+    if hangul > kana and hangul > cjk_ideo:
+        return "ko"
+    if kana > hangul:
+        return "ja"
+    if cjk_ideo > 0:
+        return "zh"
+    return None
+
 
 @dataclass
 class RuleCondition:
@@ -83,6 +113,12 @@ class EvaluationContext:
     tool_names: list[str]
     original_model: str
     classified_intent: str | None = None
+    detected_language: str | None = None
+    hour_of_day: int | None = None
+    day_of_week: str | None = None
+    daily_cost: float | None = None
+    monthly_cost: float | None = None
+    request_count_hourly: int | None = None
 
     @classmethod
     def from_request(cls, data: dict) -> EvaluationContext:
@@ -97,6 +133,11 @@ class EvaluationContext:
             fn = t.get("function", {})
             if fn.get("name"):
                 tool_names.append(fn["name"])
+
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        day_names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
         return cls(
             user_text=user_text,
@@ -114,4 +155,7 @@ class EvaluationContext:
             tool_count=len(tools),
             tool_names=tool_names,
             original_model=data.get("model", ""),
+            detected_language=_detect_language(user_text),
+            hour_of_day=now.hour,
+            day_of_week=day_names[now.weekday()],
         )
