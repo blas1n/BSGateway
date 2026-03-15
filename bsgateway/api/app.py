@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
+from bsgateway.audit.repository import AuditRepository
 from bsgateway.core.config import settings
 from bsgateway.core.database import close_pool, get_pool
 from bsgateway.core.security import hash_api_key
-from bsgateway.audit.repository import AuditRepository
 from bsgateway.presets.repository import FeedbackRepository
 from bsgateway.rules.repository import RulesRepository
 from bsgateway.tenant.repository import TenantRepository
@@ -82,19 +82,23 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="BSGateway API",
-        version="0.1.0",
-        description="Multi-tenant LLM routing gateway",
+        version="0.4.0",
+        description=(
+            "Multi-tenant LLM routing gateway with complexity-based model selection. "
+            "Provides OpenAI-compatible chat completions, rule-based routing, "
+            "usage analytics, and audit logging."
+        ),
         lifespan=lifespan,
     )
 
     from bsgateway.api.routers.audit import router as audit_router
     from bsgateway.api.routers.chat import router as chat_router
     from bsgateway.api.routers.feedback import router as feedback_router
-    from bsgateway.api.routers.usage import router as usage_router
     from bsgateway.api.routers.intents import router as intents_router
     from bsgateway.api.routers.presets import router as presets_router
     from bsgateway.api.routers.rules import router as rules_router
     from bsgateway.api.routers.tenants import router as tenants_router
+    from bsgateway.api.routers.usage import router as usage_router
 
     app.include_router(chat_router, prefix="/api/v1")
     app.include_router(tenants_router, prefix="/api/v1")

@@ -17,7 +17,7 @@ router = APIRouter(tags=["presets"])
 _registry = PresetRegistry()
 
 
-@router.get("/presets", response_model=list[PresetSummary])
+@router.get("/presets", response_model=list[PresetSummary], summary="List presets")
 async def list_presets(
     _auth: AuthContext = Depends(require_admin),
 ) -> list[PresetSummary]:
@@ -37,6 +37,7 @@ async def list_presets(
     "/tenants/{tenant_id}/presets/apply",
     response_model=PresetApplyResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Apply preset",
 )
 async def apply_preset(
     tenant_id: UUID,

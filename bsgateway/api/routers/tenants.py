@@ -4,7 +4,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_audit_service, get_encryption_key, get_pool, require_admin
+from bsgateway.api.deps import (
+    AuthContext,
+    get_audit_service,
+    get_encryption_key,
+    get_pool,
+    require_admin,
+)
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.tenant.models import (
     ApiKeyCreate,
@@ -35,7 +41,12 @@ def get_tenant_service(request: Request) -> TenantService:
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=TenantResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=TenantResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create tenant",
+)
 async def create_tenant(
     body: TenantCreate,
     request: Request,
@@ -55,7 +66,7 @@ async def create_tenant(
     return result
 
 
-@router.get("", response_model=list[TenantResponse])
+@router.get("", response_model=list[TenantResponse], summary="List tenants")
 async def list_tenants(
     request: Request,
     limit: int = 50,
@@ -66,7 +77,7 @@ async def list_tenants(
     return await svc.list_tenants(limit, offset)
 
 
-@router.get("/{tenant_id}", response_model=TenantResponse)
+@router.get("/{tenant_id}", response_model=TenantResponse, summary="Get tenant")
 async def get_tenant(
     tenant_id: UUID,
     request: Request,
@@ -79,7 +90,7 @@ async def get_tenant(
     return tenant
 
 
-@router.patch("/{tenant_id}", response_model=TenantResponse)
+@router.patch("/{tenant_id}", response_model=TenantResponse, summary="Update tenant")
 async def update_tenant(
     tenant_id: UUID,
     body: TenantUpdate,
@@ -102,7 +113,7 @@ async def update_tenant(
     return tenant
 
 
-@router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Deactivate tenant")
 async def deactivate_tenant(
     tenant_id: UUID,
     request: Request,
@@ -126,6 +137,7 @@ async def deactivate_tenant(
     "/{tenant_id}/keys",
     response_model=ApiKeyCreatedResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create API key",
 )
 async def create_api_key(
     tenant_id: UUID,
@@ -140,7 +152,7 @@ async def create_api_key(
     return await svc.create_api_key(tenant_id, body.name, body.scopes)
 
 
-@router.get("/{tenant_id}/keys", response_model=list[ApiKeyResponse])
+@router.get("/{tenant_id}/keys", response_model=list[ApiKeyResponse], summary="List API keys")
 async def list_api_keys(
     tenant_id: UUID,
     request: Request,
@@ -150,7 +162,11 @@ async def list_api_keys(
     return await svc.list_api_keys(tenant_id)
 
 
-@router.delete("/{tenant_id}/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{tenant_id}/keys/{key_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke API key",
+)
 async def revoke_api_key(
     tenant_id: UUID,
     key_id: UUID,
@@ -170,6 +186,7 @@ async def revoke_api_key(
     "/{tenant_id}/models",
     response_model=TenantModelResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Register model",
 )
 async def create_model(
     tenant_id: UUID,
@@ -193,7 +210,7 @@ async def create_model(
     return result
 
 
-@router.get("/{tenant_id}/models", response_model=list[TenantModelResponse])
+@router.get("/{tenant_id}/models", response_model=list[TenantModelResponse], summary="List models")
 async def list_models(
     tenant_id: UUID,
     request: Request,
@@ -203,7 +220,11 @@ async def list_models(
     return await svc.list_models(tenant_id)
 
 
-@router.get("/{tenant_id}/models/{model_id}", response_model=TenantModelResponse)
+@router.get(
+    "/{tenant_id}/models/{model_id}",
+    response_model=TenantModelResponse,
+    summary="Get model",
+)
 async def get_model(
     tenant_id: UUID,
     model_id: UUID,
@@ -217,7 +238,11 @@ async def get_model(
     return model
 
 
-@router.patch("/{tenant_id}/models/{model_id}", response_model=TenantModelResponse)
+@router.patch(
+    "/{tenant_id}/models/{model_id}",
+    response_model=TenantModelResponse,
+    summary="Update model",
+)
 async def update_model(
     tenant_id: UUID,
     model_id: UUID,
@@ -235,7 +260,11 @@ async def update_model(
     return model
 
 
-@router.delete("/{tenant_id}/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{tenant_id}/models/{model_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete model",
+)
 async def delete_model(
     tenant_id: UUID,
     model_id: UUID,

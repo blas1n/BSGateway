@@ -35,7 +35,12 @@ def _to_response(row: asyncpg.Record) -> IntentResponse:
     )
 
 
-@router.post("", response_model=IntentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=IntentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create intent",
+)
 async def create_intent(
     tenant_id: UUID,
     body: IntentCreate,
@@ -58,7 +63,7 @@ async def create_intent(
     return _to_response(row)
 
 
-@router.get("", response_model=list[IntentResponse])
+@router.get("", response_model=list[IntentResponse], summary="List intents")
 async def list_intents(
     tenant_id: UUID,
     request: Request,
@@ -69,7 +74,7 @@ async def list_intents(
     return [_to_response(r) for r in rows]
 
 
-@router.get("/{intent_id}", response_model=IntentResponse)
+@router.get("/{intent_id}", response_model=IntentResponse, summary="Get intent")
 async def get_intent(
     tenant_id: UUID,
     intent_id: UUID,
@@ -83,7 +88,7 @@ async def get_intent(
     return _to_response(row)
 
 
-@router.patch("/{intent_id}", response_model=IntentResponse)
+@router.patch("/{intent_id}", response_model=IntentResponse, summary="Update intent")
 async def update_intent(
     tenant_id: UUID,
     intent_id: UUID,
@@ -116,7 +121,7 @@ async def update_intent(
     return _to_response(row)
 
 
-@router.delete("/{intent_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{intent_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete intent")
 async def delete_intent(
     tenant_id: UUID,
     intent_id: UUID,
@@ -136,6 +141,7 @@ async def delete_intent(
     "/{intent_id}/examples",
     response_model=ExampleResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Add example",
 )
 async def add_example(
     tenant_id: UUID,
@@ -162,6 +168,7 @@ async def add_example(
 @router.delete(
     "/{intent_id}/examples/{example_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete example",
 )
 async def delete_example(
     tenant_id: UUID,
@@ -177,7 +184,7 @@ async def delete_example(
     await repo.delete_example(example_id, intent_id)
 
 
-@router.get("/{intent_id}/examples", response_model=list[ExampleResponse])
+@router.get("/{intent_id}/examples", response_model=list[ExampleResponse], summary="List examples")
 async def list_examples(
     tenant_id: UUID,
     intent_id: UUID,

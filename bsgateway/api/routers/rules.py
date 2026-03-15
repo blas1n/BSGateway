@@ -120,7 +120,12 @@ async def _build_rule_responses_batch(
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=RuleResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=RuleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create routing rule",
+)
 async def create_rule(
     tenant_id: UUID,
     body: RuleCreate,
@@ -156,7 +161,7 @@ async def create_rule(
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT, summary="Reorder rules")
 async def reorder_rules(
     tenant_id: UUID,
     body: ReorderRequest,
@@ -172,7 +177,7 @@ async def reorder_rules(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/test", response_model=RuleTestResponse)
+@router.post("/test", response_model=RuleTestResponse, summary="Test rule matching")
 async def test_rules(
     tenant_id: UUID,
     body: RuleTestRequest,
@@ -277,7 +282,7 @@ async def test_rules(
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=list[RuleResponse])
+@router.get("", response_model=list[RuleResponse], summary="List rules")
 async def list_rules(
     tenant_id: UUID,
     request: Request,
@@ -288,7 +293,7 @@ async def list_rules(
     return await _build_rule_responses_batch(repo, rows, tenant_id)
 
 
-@router.get("/{rule_id}", response_model=RuleResponse)
+@router.get("/{rule_id}", response_model=RuleResponse, summary="Get rule")
 async def get_rule(
     tenant_id: UUID,
     rule_id: UUID,
@@ -302,7 +307,7 @@ async def get_rule(
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.patch("/{rule_id}", response_model=RuleResponse)
+@router.patch("/{rule_id}", response_model=RuleResponse, summary="Update rule")
 async def update_rule(
     tenant_id: UUID,
     rule_id: UUID,
@@ -343,7 +348,7 @@ async def update_rule(
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete rule")
 async def delete_rule(
     tenant_id: UUID,
     rule_id: UUID,

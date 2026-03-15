@@ -62,7 +62,7 @@ def _parse_period(
     )
 
 
-@router.get("", response_model=UsageResponse)
+@router.get("", response_model=UsageResponse, summary="Get usage statistics")
 async def get_usage(
     tenant_id: UUID,
     request: Request,

@@ -31,6 +31,18 @@ class ConditionSchema(BaseModel):
     value: ConditionValue = Field(...)
     negate: bool = False
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "condition_type": "token_count",
+                "field": "estimated_tokens",
+                "operator": "gt",
+                "value": 500,
+                "negate": False,
+            },
+        },
+    }
+
     @field_validator("value")
     @classmethod
     def validate_value(cls, v: ConditionValue) -> ConditionValue:
@@ -61,6 +73,26 @@ class RuleCreate(BaseModel):
     is_default: bool = False
     target_model: str = Field(..., min_length=1)
     conditions: list[ConditionSchema] = Field(default_factory=list)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "Route complex to GPT-4",
+                "priority": 10,
+                "is_default": False,
+                "target_model": "gpt-4o",
+                "conditions": [
+                    {
+                        "condition_type": "token_count",
+                        "field": "estimated_tokens",
+                        "operator": "gt",
+                        "value": 500,
+                        "negate": False,
+                    },
+                ],
+            },
+        },
+    }
 
 
 class RuleUpdate(BaseModel):
@@ -100,6 +132,20 @@ class ReorderRequest(BaseModel):
 class RuleTestRequest(BaseModel):
     messages: list[dict]
     model: str = "auto"
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Explain quantum computing in detail",
+                    },
+                ],
+                "model": "auto",
+            },
+        },
+    }
 
 
 class RuleTestResponse(BaseModel):

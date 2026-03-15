@@ -38,7 +38,15 @@ def _error_response(
     )
 
 
-@router.post("/chat/completions")
+@router.post(
+    "/chat/completions",
+    summary="Chat completions",
+    responses={
+        401: {"description": "Invalid or expired API key"},
+        429: {"description": "Rate limit exceeded"},
+        502: {"description": "Upstream provider error"},
+    },
+)
 async def chat_completions(
     request: Request,
     auth: AuthContext = Depends(get_auth_context),

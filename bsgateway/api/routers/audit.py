@@ -40,7 +40,7 @@ def _safe_json_loads(raw: str | dict | None) -> dict:
         return {}
 
 
-@router.get("", response_model=list[AuditLogResponse])
+@router.get("", response_model=list[AuditLogResponse], summary="List audit logs")
 async def list_audit_logs(
     tenant_id: UUID,
     request: Request,

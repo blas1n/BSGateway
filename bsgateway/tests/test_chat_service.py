@@ -1,10 +1,8 @@
 """Tests for ChatService: model resolution, tenant config loading, litellm delegation."""
 from __future__ import annotations
 
-import json
-from collections import defaultdict
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -14,8 +12,8 @@ from bsgateway.chat.service import (
     NoRuleMatchedError,
 )
 from bsgateway.rules.models import (
-    RuleMatch,
     RoutingRule,
+    RuleMatch,
     TenantConfig,
     TenantModel,
 )
@@ -114,13 +112,13 @@ class TestResolveModel:
                 rule=config.rules[0],
                 target_model="gpt-4o",
             )
-            model, match = await svc.resolve_model(
+            model, _match = await svc.resolve_model(
                 config, {"model": "auto", "messages": [{"role": "user", "content": "test"}]}
             )
 
         assert model.model_name == "gpt-4o"
-        assert match is not None
-        assert match.target_model == "gpt-4o"
+        assert _match is not None
+        assert _match.target_model == "gpt-4o"
 
     async def test_auto_no_rule_matches(self):
         svc = ChatService(_make_pool(), ENCRYPTION_KEY)
@@ -168,7 +166,7 @@ class TestResolveModel:
             mock_eval.return_value = RuleMatch(
                 rule=config.rules[0], target_model="gpt-4o",
             )
-            model, match = await svc.resolve_model(
+            model, _match = await svc.resolve_model(
                 config, {"messages": [{"role": "user", "content": "test"}]}
             )
 
@@ -217,7 +215,10 @@ class TestComplete:
             patch.object(svc, "load_tenant_config", new_callable=AsyncMock) as mock_load,
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="sk-test-key"),
-            patch("litellm.acompletion", new_callable=AsyncMock, return_value=mock_response) as mock_acomp,
+            patch(
+                "litellm.acompletion", new_callable=AsyncMock,
+                return_value=mock_response,
+            ) as mock_acomp,
         ):
             config = _make_tenant_config()
             mock_load.return_value = config
@@ -251,7 +252,10 @@ class TestComplete:
             patch.object(svc, "load_tenant_config", new_callable=AsyncMock) as mock_load,
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="sk-key"),
-            patch("litellm.acompletion", new_callable=AsyncMock, return_value=mock_response) as mock_acomp,
+            patch(
+                "litellm.acompletion", new_callable=AsyncMock,
+                return_value=mock_response,
+            ) as mock_acomp,
         ):
             mock_load.return_value = _make_tenant_config()
             model = _make_tenant_config().models["gpt-4o"]
@@ -278,7 +282,10 @@ class TestComplete:
         with (
             patch.object(svc, "load_tenant_config", new_callable=AsyncMock) as mock_load,
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
-            patch("litellm.acompletion", new_callable=AsyncMock, return_value=mock_response) as mock_acomp,
+            patch(
+                "litellm.acompletion", new_callable=AsyncMock,
+                return_value=mock_response,
+            ) as mock_acomp,
         ):
             mock_load.return_value = _make_tenant_config()
             model = TenantModel(
@@ -288,7 +295,7 @@ class TestComplete:
             )
             mock_resolve.return_value = (model, None)
 
-            result = await svc.complete(
+            await svc.complete(
                 TENANT_ID,
                 {"model": "local-llm", "messages": [{"role": "user", "content": "hi"}]},
             )
@@ -305,7 +312,10 @@ class TestComplete:
             patch.object(svc, "load_tenant_config", new_callable=AsyncMock) as mock_load,
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="key"),
-            patch("litellm.acompletion", new_callable=AsyncMock, return_value=mock_response) as mock_acomp,
+            patch(
+                "litellm.acompletion", new_callable=AsyncMock,
+                return_value=mock_response,
+            ) as mock_acomp,
         ):
             mock_load.return_value = _make_tenant_config()
             model = TenantModel(
@@ -481,7 +491,10 @@ class TestLogRequest:
 
         with (
             patch("bsgateway.chat.service._log_sql") as mock_log_sql,
-            patch("bsgateway.rules.budget.BudgetTracker.increment_request_count", new_callable=AsyncMock) as mock_budget,
+            patch(
+                "bsgateway.rules.budget.BudgetTracker.increment_request_count",
+                new_callable=AsyncMock,
+            ) as mock_budget,
         ):
             mock_log_sql.query.side_effect = lambda q: q
 

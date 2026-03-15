@@ -15,6 +15,18 @@ class TenantCreate(BaseModel):
     slug: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9-]*$")
     settings: dict = Field(default_factory=dict)
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "Acme Corp",
+                "slug": "acme-corp",
+                "settings": {
+                    "rate_limit": {"requests_per_minute": 60},
+                },
+            },
+        },
+    }
+
 
 class TenantUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
@@ -31,6 +43,22 @@ class TenantResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Acme Corp",
+                "slug": "acme-corp",
+                "is_active": True,
+                "settings": {
+                    "rate_limit": {"requests_per_minute": 60},
+                },
+                "created_at": "2026-01-15T09:00:00Z",
+                "updated_at": "2026-01-15T09:00:00Z",
+            },
+        },
+    }
+
 
 # ---------------------------------------------------------------------------
 # API Keys
@@ -40,6 +68,15 @@ class TenantResponse(BaseModel):
 class ApiKeyCreate(BaseModel):
     name: str = Field(default="", max_length=255)
     scopes: list[str] = Field(default_factory=list)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "Production Key",
+                "scopes": ["chat", "admin"],
+            },
+        },
+    }
 
 
 class ApiKeyCreatedResponse(BaseModel):
@@ -79,6 +116,19 @@ class TenantModelCreate(BaseModel):
     api_base: str | None = None
     extra_params: dict = Field(default_factory=dict)
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "model_name": "gpt-4o",
+                "provider": "openai",
+                "litellm_model": "openai/gpt-4o",
+                "api_key": "sk-...",
+                "api_base": None,
+                "extra_params": {},
+            },
+        },
+    }
+
 
 class TenantModelUpdate(BaseModel):
     model_name: str | None = Field(None, min_length=1, max_length=255)
@@ -100,3 +150,20 @@ class TenantModelResponse(BaseModel):
     extra_params: dict
     created_at: datetime
     updated_at: datetime
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "tenant_id": "660e8400-e29b-41d4-a716-446655440000",
+                "model_name": "gpt-4o",
+                "provider": "openai",
+                "litellm_model": "openai/gpt-4o",
+                "api_base": None,
+                "is_active": True,
+                "extra_params": {},
+                "created_at": "2026-01-15T09:00:00Z",
+                "updated_at": "2026-01-15T09:00:00Z",
+            },
+        },
+    }

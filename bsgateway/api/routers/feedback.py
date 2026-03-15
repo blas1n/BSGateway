@@ -15,6 +15,7 @@ router = APIRouter(tags=["feedback"])
     "/tenants/{tenant_id}/feedback",
     response_model=FeedbackResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Submit feedback",
 )
 async def submit_feedback(
     tenant_id: UUID,
@@ -44,6 +45,7 @@ async def submit_feedback(
 @router.get(
     "/tenants/{tenant_id}/feedback",
     response_model=list[FeedbackResponse],
+    summary="List feedback",
 )
 async def list_feedback(
     tenant_id: UUID,
