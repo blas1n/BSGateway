@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_encryption_key, get_pool, require_admin
+from bsgateway.api.deps import AuthContext, get_audit_service, get_encryption_key, get_pool, require_admin
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.tenant.models import (
     ApiKeyCreate,
@@ -43,9 +43,16 @@ async def create_tenant(
 ) -> TenantResponse:
     svc = get_tenant_service(request)
     try:
-        return await svc.create_tenant(body.name, body.slug, body.settings)
+        result = await svc.create_tenant(body.name, body.slug, body.settings)
     except DuplicateError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message) from e
+    audit = get_audit_service(request)
+    await audit.record(
+        result.id, _auth.key_hash or "superadmin",
+        "tenant.created", "tenant", str(result.id),
+        {"name": body.name, "slug": body.slug},
+    )
+    return result
 
 
 @router.get("", response_model=list[TenantResponse])
@@ -103,6 +110,11 @@ async def deactivate_tenant(
 ) -> None:
     svc = get_tenant_service(request)
     await svc.deactivate_tenant(tenant_id)
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id, _auth.key_hash or "superadmin",
+        "tenant.deactivated", "tenant", str(tenant_id),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +179,18 @@ async def create_model(
 ) -> TenantModelResponse:
     svc = get_tenant_service(request)
     try:
-        return await svc.create_model(tenant_id, body)
+        result = await svc.create_model(tenant_id, body)
     except DuplicateError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id, _auth.key_hash or "superadmin",
+        "model.created", "model", str(result.id),
+        {"model_name": body.model_name, "provider": body.provider},
+    )
+    return result
 
 
 @router.get("/{tenant_id}/models", response_model=list[TenantModelResponse])
@@ -225,3 +244,8 @@ async def delete_model(
 ) -> None:
     svc = get_tenant_service(request)
     await svc.delete_model(model_id, tenant_id)
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id, _auth.key_hash or "superadmin",
+        "model.deleted", "model", str(model_id),
+    )

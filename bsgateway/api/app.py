@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from bsgateway.core.config import settings
 from bsgateway.core.database import close_pool, get_pool
 from bsgateway.core.security import hash_api_key
+from bsgateway.audit.repository import AuditRepository
 from bsgateway.presets.repository import FeedbackRepository
 from bsgateway.rules.repository import RulesRepository
 from bsgateway.tenant.repository import TenantRepository
@@ -60,6 +61,9 @@ async def lifespan(app: FastAPI):
     feedback_repo = FeedbackRepository(pool)
     await feedback_repo.init_schema()
 
+    audit_repo = AuditRepository(pool)
+    await audit_repo.init_schema()
+
     # Initialize Redis (optional, used for rate limiting and budget tracking)
     app.state.redis = await _init_redis()
 
@@ -83,6 +87,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    from bsgateway.api.routers.audit import router as audit_router
     from bsgateway.api.routers.chat import router as chat_router
     from bsgateway.api.routers.feedback import router as feedback_router
     from bsgateway.api.routers.usage import router as usage_router
@@ -98,5 +103,6 @@ def create_app() -> FastAPI:
     app.include_router(presets_router, prefix="/api/v1")
     app.include_router(feedback_router, prefix="/api/v1")
     app.include_router(usage_router, prefix="/api/v1")
+    app.include_router(audit_router, prefix="/api/v1")
 
     return app

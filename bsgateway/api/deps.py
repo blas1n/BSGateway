@@ -112,6 +112,15 @@ def require_admin(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
     return auth
 
 
+def get_audit_service(request: Request):
+    """Create an AuditService instance from the request."""
+    from bsgateway.audit.repository import AuditRepository
+    from bsgateway.audit.service import AuditService
+
+    pool = request.app.state.db_pool
+    return AuditService(AuditRepository(pool))
+
+
 def require_tenant_access(
     tenant_id: UUID,
     auth: AuthContext = Depends(get_auth_context),

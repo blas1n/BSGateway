@@ -7,7 +7,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_admin
+from bsgateway.api.deps import AuthContext, get_audit_service, get_pool, require_admin
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.rules.engine import RuleEngine
 from bsgateway.rules.models import (
@@ -145,6 +145,13 @@ async def create_rule(
             row["id"],
             [c.model_dump() for c in body.conditions],
         )
+
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id, _auth.key_hash or "superadmin",
+        "rule.created", "rule", str(row["id"]),
+        {"name": body.name, "target_model": body.target_model},
+    )
 
     return await _build_rule_response(repo, row, tenant_id)
 
@@ -345,3 +352,8 @@ async def delete_rule(
 ) -> None:
     repo = _get_repo(request)
     await repo.delete_rule(rule_id, tenant_id)
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id, _auth.key_hash or "superadmin",
+        "rule.deleted", "rule", str(rule_id),
+    )
