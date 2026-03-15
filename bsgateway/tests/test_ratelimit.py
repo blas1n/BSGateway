@@ -1,0 +1,253 @@
+"""Tests for the rate limiter."""
+from __future__ import annotations
+
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+from bsgateway.api.app import create_app
+from bsgateway.chat.ratelimit import RateLimiter, RateLimitResult
+from bsgateway.core.security import hash_api_key
+
+SUPERADMIN_KEY = "test-superadmin-key"
+ENCRYPTION_KEY_HEX = os.urandom(32).hex()
+TENANT_ID = uuid4()
+TENANT_KEY = "bsg_test-tenant-ratelimit-key"
+
+
+class TestRateLimiter:
+    """Unit tests for RateLimiter."""
+
+    async def test_under_limit_allowed(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=1)
+
+        limiter = RateLimiter(redis)
+        result = await limiter.check("tenant-1", rpm=60)
+
+        assert result.allowed is True
+        assert result.remaining == 59
+        assert result.limit == 60
+
+    async def test_at_limit_still_allowed(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=60)
+
+        limiter = RateLimiter(redis)
+        result = await limiter.check("tenant-1", rpm=60)
+
+        assert result.allowed is True
+        assert result.remaining == 0
+
+    async def test_over_limit_denied(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=61)
+
+        limiter = RateLimiter(redis)
+        result = await limiter.check("tenant-1", rpm=60)
+
+        assert result.allowed is False
+        assert result.remaining == 0
+        assert result.limit == 60
+
+    async def test_first_request_sets_expire(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=1)
+
+        limiter = RateLimiter(redis)
+        await limiter.check("tenant-1", rpm=60)
+
+        redis.expire.assert_called_once()
+
+    async def test_subsequent_request_no_extra_expire(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=5)
+
+        limiter = RateLimiter(redis)
+        await limiter.check("tenant-1", rpm=60)
+
+        # expire should not be called for count > 1
+        redis.expire.assert_not_called()
+
+    async def test_redis_error_fails_open(self):
+        redis = AsyncMock()
+        redis.incr = AsyncMock(side_effect=ConnectionError("Redis down"))
+
+        limiter = RateLimiter(redis)
+        result = await limiter.check("tenant-1", rpm=60)
+
+        assert result.allowed is True  # Fail-open
+
+    async def test_independent_per_tenant(self):
+        redis = AsyncMock()
+        call_count = 0
+
+        async def mock_incr(key):
+            nonlocal call_count
+            call_count += 1
+            return call_count  # Each call returns different count
+
+        redis.incr = mock_incr
+
+        limiter = RateLimiter(redis)
+        r1 = await limiter.check("tenant-a", rpm=60)
+        r2 = await limiter.check("tenant-b", rpm=60)
+
+        assert r1.allowed is True
+        assert r2.allowed is True
+
+    async def test_reset_at_is_future_timestamp(self):
+        import time
+
+        redis = AsyncMock()
+        redis.incr = AsyncMock(return_value=1)
+
+        limiter = RateLimiter(redis)
+        result = await limiter.check("tenant-1", rpm=60)
+
+        assert result.reset_at > int(time.time()) - 1
+
+
+class TestRateLimitAPI:
+    """Integration tests for rate limiting in the chat endpoint."""
+
+    @pytest.fixture
+    def mock_pool(self) -> AsyncMock:
+        pool = AsyncMock()
+        pool._closed = False
+        conn = AsyncMock()
+        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+        return pool
+
+    @pytest.fixture
+    def app(self, mock_pool: AsyncMock):
+        app = create_app()
+        app.state.db_pool = mock_pool
+        app.state.encryption_key = bytes.fromhex(ENCRYPTION_KEY_HEX)
+        app.state.superadmin_key_hash = hash_api_key(SUPERADMIN_KEY)
+        app.state.redis = AsyncMock()  # Redis available
+        return app
+
+    @pytest.fixture
+    def client(self, app) -> TestClient:
+        return TestClient(app, raise_server_exceptions=False)
+
+    @pytest.fixture
+    def tenant_headers(self) -> dict:
+        return {"Authorization": f"Bearer {TENANT_KEY}"}
+
+    def _patch_auth(self):
+        from datetime import UTC, datetime
+
+        return patch(
+            "bsgateway.tenant.repository.TenantRepository.get_api_key_by_hash",
+            new_callable=AsyncMock,
+            return_value={
+                "id": uuid4(),
+                "tenant_id": TENANT_ID,
+                "key_hash": hash_api_key(TENANT_KEY),
+                "key_prefix": "bsg_test",
+                "name": "test-key",
+                "scopes": ["chat"],
+                "is_active": True,
+                "expires_at": None,
+                "last_used_at": None,
+                "created_at": datetime.now(UTC),
+                "tenant_is_active": True,
+            },
+        )
+
+    def _patch_tenant(self, settings=None):
+        from datetime import UTC, datetime
+
+        return patch(
+            "bsgateway.tenant.repository.TenantRepository.get_tenant",
+            new_callable=AsyncMock,
+            return_value={
+                "id": TENANT_ID,
+                "name": "Test",
+                "slug": "test",
+                "is_active": True,
+                "settings": settings or "{}",
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
+            },
+        )
+
+    def test_rate_limited_returns_429(self, client: TestClient, tenant_headers):
+        with (
+            self._patch_auth(),
+            self._patch_tenant('{"rate_limit": {"requests_per_minute": 5}}'),
+            patch(
+                "bsgateway.chat.ratelimit.RateLimiter.check",
+                new_callable=AsyncMock,
+                return_value=RateLimitResult(
+                    allowed=False, limit=5, remaining=0, reset_at=9999999999,
+                ),
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/chat/completions",
+                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+                headers=tenant_headers,
+            )
+
+        assert resp.status_code == 429
+        data = resp.json()
+        assert data["error"]["code"] == "rate_limit_exceeded"
+        assert resp.headers.get("X-RateLimit-Limit") == "5"
+        assert resp.headers.get("X-RateLimit-Remaining") == "0"
+
+    def test_no_rate_limit_setting_passes_through(self, client: TestClient, tenant_headers):
+        mock_response = MagicMock()
+        mock_response.model_dump.return_value = {"id": "chatcmpl-1", "choices": []}
+
+        with (
+            self._patch_auth(),
+            self._patch_tenant("{}"),
+            patch(
+                "bsgateway.chat.service.ChatService.complete",
+                new_callable=AsyncMock,
+                return_value=mock_response,
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/chat/completions",
+                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+                headers=tenant_headers,
+            )
+
+        assert resp.status_code == 200
+
+    def test_no_redis_skips_rate_limit(self, mock_pool, tenant_headers):
+        """When Redis is not available, rate limiting is skipped."""
+        app = create_app()
+        app.state.db_pool = mock_pool
+        app.state.encryption_key = bytes.fromhex(ENCRYPTION_KEY_HEX)
+        app.state.superadmin_key_hash = hash_api_key(SUPERADMIN_KEY)
+        app.state.redis = None  # No Redis
+
+        client = TestClient(app, raise_server_exceptions=False)
+
+        mock_response = MagicMock()
+        mock_response.model_dump.return_value = {"id": "chatcmpl-1", "choices": []}
+
+        with (
+            self._patch_auth(),
+            patch(
+                "bsgateway.chat.service.ChatService.complete",
+                new_callable=AsyncMock,
+                return_value=mock_response,
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/chat/completions",
+                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+                headers=tenant_headers,
+            )
+
+        assert resp.status_code == 200
