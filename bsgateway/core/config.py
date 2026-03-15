@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,9 +16,42 @@ class Settings(BaseSettings):
     redis_password: str = ""
     log_level: str = "INFO"
 
+    # API server
+    api_port: int = 8000
+    api_host: str = "0.0.0.0"
+
+    # Auth
+    jwt_secret: str = ""
+    encryption_key: str = ""  # 32-byte hex string for AES-256-GCM
+
+    # Superadmin bootstrap key (for creating first tenant)
+    superadmin_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    @property
+    def encryption_key_bytes(self) -> bytes:
+        """Return the encryption key as raw bytes."""
+        if not self.encryption_key:
+            warnings.warn(
+                "ENCRYPTION_KEY is not set; provider API keys will not be encrypted",
+                stacklevel=2,
+            )
+            return b""
+        try:
+            key = bytes.fromhex(self.encryption_key)
+        except ValueError as e:
+            raise ValueError(
+                "ENCRYPTION_KEY must be a valid hex string"
+                f" (got {len(self.encryption_key)} chars): {e}"
+            ) from e
+        if len(key) != 32:
+            raise ValueError(
+                f"ENCRYPTION_KEY must be 32 bytes (64 hex chars), got {len(key)} bytes"
+            )
+        return key
 
 
 settings = Settings()

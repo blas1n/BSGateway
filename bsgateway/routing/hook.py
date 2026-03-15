@@ -9,7 +9,6 @@ import structlog
 import yaml
 
 from bsgateway.routing.classifiers import ClassifierProtocol, create_classifier
-from bsgateway.routing.classifiers.base import ClassificationResult
 from bsgateway.routing.collector import RoutingCollector
 from bsgateway.routing.models import (
     ClassifierConfig,
@@ -283,7 +282,7 @@ class BSGatewayRouter:
 
         # Record asynchronously (non-blocking)
         if self.collector:
-            asyncio.create_task(self.collector.record(data, result, decision))
+            _task = asyncio.create_task(self.collector.record(data, result, decision))  # noqa: RUF006
 
         return decision
 

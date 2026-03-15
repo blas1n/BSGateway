@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import cast
 
 import litellm
-from litellm.types.utils import Choices, ModelResponse
 import structlog
+from litellm.types.utils import Choices, ModelResponse
 
 from bsgateway.routing.classifiers.base import (
     ClassificationResult,
