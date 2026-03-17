@@ -33,13 +33,20 @@ export function ModelsPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState<string | null>(null);
+
   const handleDelete = async (model: TenantModel) => {
-    if (!confirm(`Delete model "${model.model_name}"?`)) return;
-    try {
-      await tenantsApi.deleteModel(TENANT_ID, model.id);
-      refetch();
-    } catch {
-      alert('Failed to delete model');
+    if (deleting === model.id) {
+      // Second click confirms
+      try {
+        await tenantsApi.deleteModel(TENANT_ID, model.id);
+        setDeleting(null);
+        refetch();
+      } catch {
+        setDeleting(null);
+      }
+    } else {
+      setDeleting(model.id);
     }
   };
 
@@ -142,9 +149,14 @@ export function ModelsPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(model)}
-                  className="text-red-500 hover:text-red-700 text-sm"
+                  onBlur={() => setDeleting(null)}
+                  className={`text-sm ${
+                    deleting === model.id
+                      ? 'text-white bg-red-600 px-3 py-1 rounded'
+                      : 'text-red-500 hover:text-red-700'
+                  }`}
                 >
-                  Delete
+                  {deleting === model.id ? 'Confirm?' : 'Delete'}
                 </button>
               </div>
             ))}

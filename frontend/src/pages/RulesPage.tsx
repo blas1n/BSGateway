@@ -35,13 +35,19 @@ export function RulesPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState<string | null>(null);
+
   const handleDelete = async (rule: Rule) => {
-    if (!confirm(`Delete rule "${rule.name}"?`)) return;
-    try {
-      await rulesApi.delete(TENANT_ID, rule.id);
-      refetch();
-    } catch {
-      alert('Failed to delete rule');
+    if (deleting === rule.id) {
+      try {
+        await rulesApi.delete(TENANT_ID, rule.id);
+        setDeleting(null);
+        refetch();
+      } catch {
+        setDeleting(null);
+      }
+    } else {
+      setDeleting(rule.id);
     }
   };
 
@@ -140,9 +146,14 @@ export function RulesPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(rule)}
-                  className="text-red-500 hover:text-red-700 text-sm"
+                  onBlur={() => setDeleting(null)}
+                  className={`text-sm ${
+                    deleting === rule.id
+                      ? 'text-white bg-red-600 px-3 py-1 rounded'
+                      : 'text-red-500 hover:text-red-700'
+                  }`}
                 >
-                  Delete
+                  {deleting === rule.id ? 'Confirm?' : 'Delete'}
                 </button>
               </div>
             ))}
