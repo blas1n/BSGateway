@@ -35,7 +35,11 @@ class SqlLoader:
         return self._queries[name]
 
     def _parse_queries(self) -> None:
-        content = (self._sql_dir / "queries.sql").read_text()
+        for sql_file in sorted(self._sql_dir.glob("*queries.sql")):
+            self._parse_file(sql_file)
+
+    def _parse_file(self, path: Path) -> None:
+        content = path.read_text()
         current_name: str | None = None
         current_lines: list[str] = []
         for line in content.splitlines():
