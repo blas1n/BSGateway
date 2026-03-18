@@ -36,18 +36,21 @@ export function RulesPage() {
   };
 
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = async (rule: Rule) => {
     if (deleting === rule.id) {
+      setDeleteError(null);
       try {
         await rulesApi.delete(TENANT_ID, rule.id);
         setDeleting(null);
         refetch();
-      } catch {
-        setDeleting(null);
+      } catch (err) {
+        setDeleteError(err instanceof Error ? err.message : 'Delete failed');
       }
     } else {
       setDeleting(rule.id);
+      setDeleteError(null);
     }
   };
 
@@ -116,6 +119,8 @@ export function RulesPage() {
           </button>
         </div>
       )}
+
+      {deleteError && <ErrorBanner message={deleteError} onRetry={() => setDeleteError(null)} />}
 
       <div className="bg-white rounded-lg shadow">
         {rules && rules.length > 0 ? (

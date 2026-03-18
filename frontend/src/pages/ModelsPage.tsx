@@ -34,19 +34,21 @@ export function ModelsPage() {
   };
 
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = async (model: TenantModel) => {
     if (deleting === model.id) {
-      // Second click confirms
+      setDeleteError(null);
       try {
         await tenantsApi.deleteModel(TENANT_ID, model.id);
         setDeleting(null);
         refetch();
-      } catch {
-        setDeleting(null);
+      } catch (err) {
+        setDeleteError(err instanceof Error ? err.message : 'Delete failed');
       }
     } else {
       setDeleting(model.id);
+      setDeleteError(null);
     }
   };
 
@@ -124,6 +126,8 @@ export function ModelsPage() {
           </button>
         </div>
       )}
+
+      {deleteError && <ErrorBanner message={deleteError} onRetry={() => setDeleteError(null)} />}
 
       <div className="bg-white rounded-lg shadow">
         {models && models.length > 0 ? (
