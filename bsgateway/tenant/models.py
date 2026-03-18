@@ -11,9 +11,19 @@ from pydantic import BaseModel, Field
 
 
 class TenantCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    slug: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9-]*$")
-    settings: dict = Field(default_factory=dict)
+    name: str = Field(
+        ..., min_length=1, max_length=255, description="Human-readable tenant name"
+    )
+    slug: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-z][a-z0-9-]*$",
+        description="URL-friendly identifier (lowercase, hyphens allowed)",
+    )
+    settings: dict = Field(
+        default_factory=dict, description="JSON settings (e.g., rate_limit config)"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -35,13 +45,13 @@ class TenantUpdate(BaseModel):
 
 
 class TenantResponse(BaseModel):
-    id: UUID
-    name: str
-    slug: str
-    is_active: bool
-    settings: dict
-    created_at: datetime
-    updated_at: datetime
+    id: UUID = Field(description="Unique tenant identifier")
+    name: str = Field(description="Human-readable tenant name")
+    slug: str = Field(description="URL-friendly identifier")
+    is_active: bool = Field(description="Whether tenant is active or deactivated")
+    settings: dict = Field(description="Tenant configuration")
+    created_at: datetime = Field(description="Timestamp when tenant was created")
+    updated_at: datetime = Field(description="Timestamp of last update")
 
     model_config = {
         "json_schema_extra": {
@@ -66,8 +76,11 @@ class TenantResponse(BaseModel):
 
 
 class ApiKeyCreate(BaseModel):
-    name: str = Field(default="", max_length=255)
-    scopes: list[str] = Field(default_factory=list)
+    name: str = Field(default="", max_length=255, description="Optional name for this key")
+    scopes: list[str] = Field(
+        default_factory=list,
+        description="Permission scopes (e.g., 'chat', 'admin')",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -109,12 +122,24 @@ class ApiKeyResponse(BaseModel):
 
 
 class TenantModelCreate(BaseModel):
-    model_name: str = Field(..., min_length=1, max_length=255)
-    provider: str | None = Field(None, max_length=100)
-    litellm_model: str = Field(..., min_length=1, max_length=255)
-    api_key: str | None = None  # plaintext, encrypted before storage
-    api_base: str | None = None
-    extra_params: dict = Field(default_factory=dict)
+    model_name: str = Field(
+        ..., min_length=1, max_length=255, description="Alias for this model (e.g., 'gpt-4o')"
+    )
+    litellm_model: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="LiteLLM model ID in format provider/model (e.g., 'openai/gpt-4o')",
+    )
+    api_key: str | None = Field(
+        None, description="API key for the model provider (optional, encrypted at rest)"
+    )
+    api_base: str | None = Field(
+        None, description="Custom API base URL for non-standard endpoints (optional)"
+    )
+    extra_params: dict = Field(
+        default_factory=dict, description="Additional LiteLLM parameters"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -139,16 +164,16 @@ class TenantModelUpdate(BaseModel):
 
 
 class TenantModelResponse(BaseModel):
-    id: UUID
-    tenant_id: UUID
-    model_name: str
-    provider: str
-    litellm_model: str
-    api_base: str | None
-    is_active: bool
-    extra_params: dict
-    created_at: datetime
-    updated_at: datetime
+    id: UUID = Field(description="Unique model identifier")
+    tenant_id: UUID = Field(description="Tenant this model belongs to")
+    model_name: str = Field(description="Model alias")
+    provider: str = Field(description="Provider (auto-derived from litellm_model)")
+    litellm_model: str = Field(description="LiteLLM model ID (provider/model)")
+    api_base: str | None = Field(None, description="Custom API endpoint (if any)")
+    is_active: bool = Field(description="Whether model is available for routing")
+    extra_params: dict = Field(description="Additional LiteLLM parameters")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
 
     model_config = {
         "json_schema_extra": {

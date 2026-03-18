@@ -1,118 +1,176 @@
-import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { usageApi } from '../api/usage';
-import { useApi } from '../hooks/useApi';
+import { useEffect, useState } from 'react';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import { api } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 
 const TENANT_ID = localStorage.getItem('bsg_tenant_id') || '';
 
+const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+interface UsageStats {
+  total_requests: number;
+  total_tokens: number;
+  success_rate: number;
+  by_model: Record<string, number>;
+  by_rule: Record<string, number>;
+  daily_breakdown: Record<string, number>;
+}
+
 export function UsagePage() {
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
-  const { data: usage, loading, error, refetch } = useApi(
-    () => usageApi.get(TENANT_ID, period),
-    [TENANT_ID, period],
-  );
+  const [data, setData] = useState<UsageStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadUsage();
+  }, [period]);
+
+  const loadUsage = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<UsageStats>(
+        `/tenants/${TENANT_ID}/usage?period=${period}`
+      );
+      setData(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load usage data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorBanner message={error} onRetry={refetch} />;
+
+  const dailyData = data?.daily_breakdown
+    ? Object.entries(data.daily_breakdown).map(([date, requests]) => ({
+      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      requests,
+    }))
+    : [];
+
+  const modelData = data?.by_model
+    ? Object.entries(data.by_model).map(([model, requests]) => ({
+      name: model,
+      value: requests,
+    }))
+    : [];
+
+  const ruleData = data?.by_rule
+    ? Object.entries(data.by_rule).map(([rule, requests]) => ({
+      name: rule,
+      requests,
+    }))
+    : [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Usage</h2>
-        <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
-          {(['day', 'week', 'month'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1 rounded text-sm ${
-                period === p ? 'bg-white shadow font-medium' : 'text-gray-600'
-              }`}
-            >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </button>
-          ))}
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Usage Analytics</h2>
+          <p className="text-gray-500 text-sm mt-1">Routing traffic and token consumption</p>
         </div>
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as any)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="day">Today</option>
+          <option value="week">Last 7 days</option>
+          <option value="month">Last 30 days</option>
+        </select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-500">Total Requests</p>
-          <p className="text-3xl font-bold">{usage?.total_requests.toLocaleString() ?? 0}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-gray-500">Total Tokens</p>
-          <p className="text-3xl font-bold">{usage?.total_tokens.toLocaleString() ?? 0}</p>
-        </div>
-      </div>
+      {error && <ErrorBanner message={error} onRetry={loadUsage} />}
 
-      {/* Daily Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Daily Requests</h3>
-        {usage && usage.daily_breakdown.length > 0 ? (
+      {/* Summary Stats */}
+      {data && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-500 text-sm">Total Requests</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{data.total_requests}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-500 text-sm">Total Tokens</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{data.total_tokens.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-gray-500 text-sm">Success Rate</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {Math.round(data.success_rate * 100)}%
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Trend */}
+      {dailyData.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Requests</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={usage.daily_breakdown}>
+            <LineChart data={dailyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="requests" fill="#3b82f6" />
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="requests"
+                stroke="#2563eb"
+                dot={{ fill: '#2563eb' }}
+              />
+            </LineChart>
           </ResponsiveContainer>
-        ) : (
-          <p className="text-gray-500 text-center py-8">No data for this period</p>
+        </div>
+      )}
+
+      {/* By Model & By Rule */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {modelData.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Traffic by Model</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={modelData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, value }) => `${name}: ${value}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {modelData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {ruleData.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Traffic by Rule</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={ruleData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="requests" fill="#2563eb" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
-
-      {/* By Model */}
-      {usage && Object.keys(usage.by_model).length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">By Model</h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="px-4 py-2 font-medium text-gray-600">Model</th>
-                <th className="px-4 py-2 font-medium text-gray-600">Requests</th>
-                <th className="px-4 py-2 font-medium text-gray-600">Tokens</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(usage.by_model).map(([model, stats]) => (
-                <tr key={model} className="border-b border-gray-100">
-                  <td className="px-4 py-2 font-mono">{model}</td>
-                  <td className="px-4 py-2">{stats.requests.toLocaleString()}</td>
-                  <td className="px-4 py-2">{stats.tokens.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* By Rule */}
-      {usage && Object.keys(usage.by_rule).length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">By Rule</h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="px-4 py-2 font-medium text-gray-600">Rule</th>
-                <th className="px-4 py-2 font-medium text-gray-600">Matches</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(usage.by_rule).map(([rule, count]) => (
-                <tr key={rule} className="border-b border-gray-100">
-                  <td className="px-4 py-2">{rule}</td>
-                  <td className="px-4 py-2">{count.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

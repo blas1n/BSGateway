@@ -46,6 +46,7 @@ def get_tenant_service(request: Request) -> TenantService:
     response_model=TenantResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create tenant",
+    description="Create a new multi-tenant workspace. Requires admin scope.",
 )
 async def create_tenant(
     body: TenantCreate,
