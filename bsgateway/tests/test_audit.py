@@ -1,4 +1,5 @@
 """Tests for the audit logging system."""
+
 from __future__ import annotations
 
 import os
@@ -58,8 +59,11 @@ class TestAuditService:
         svc = AuditService(repo)
 
         await svc.record(
-            TENANT_ID, "superadmin",
-            "rule.created", "rule", str(uuid4()),
+            TENANT_ID,
+            "superadmin",
+            "rule.created",
+            "rule",
+            str(uuid4()),
             {"name": "test-rule"},
         )
 
@@ -77,8 +81,11 @@ class TestAuditService:
 
         # Should not raise
         await svc.record(
-            TENANT_ID, "superadmin",
-            "rule.created", "rule", str(uuid4()),
+            TENANT_ID,
+            "superadmin",
+            "rule.created",
+            "rule",
+            str(uuid4()),
         )
 
     async def test_record_with_no_details(self):
@@ -86,8 +93,11 @@ class TestAuditService:
         svc = AuditService(repo)
 
         await svc.record(
-            TENANT_ID, "superadmin",
-            "model.deleted", "model", str(uuid4()),
+            TENANT_ID,
+            "superadmin",
+            "model.deleted",
+            "model",
+            str(uuid4()),
         )
 
         call_kwargs = repo.record.call_args.kwargs
@@ -99,16 +109,18 @@ class TestAuditRepository:
 
     async def test_record_inserts_correctly(self):
         conn = AsyncMock()
-        conn.fetchrow = AsyncMock(return_value={
-            "id": uuid4(),
-            "tenant_id": TENANT_ID,
-            "actor": "superadmin",
-            "action": "rule.created",
-            "resource_type": "rule",
-            "resource_id": "abc",
-            "details": "{}",
-            "created_at": datetime.now(UTC),
-        })
+        conn.fetchrow = AsyncMock(
+            return_value={
+                "id": uuid4(),
+                "tenant_id": TENANT_ID,
+                "actor": "superadmin",
+                "action": "rule.created",
+                "resource_type": "rule",
+                "resource_id": "abc",
+                "details": "{}",
+                "created_at": datetime.now(UTC),
+            }
+        )
 
         pool = AsyncMock()
 
@@ -122,7 +134,12 @@ class TestAuditRepository:
             mock_sql.query.side_effect = lambda q: q
             repo = AuditRepository(pool)
             result = await repo.record(
-                TENANT_ID, "superadmin", "rule.created", "rule", "abc", {"name": "test"},
+                TENANT_ID,
+                "superadmin",
+                "rule.created",
+                "rule",
+                "abc",
+                {"name": "test"},
             )
 
         assert result["action"] == "rule.created"
@@ -257,8 +274,13 @@ class TestAuditWiring:
 
         now = datetime.now(UTC)
         mock_tenant = TenantResponse(
-            id=TENANT_ID, name="Test Corp", slug="test-corp",
-            is_active=True, settings={}, created_at=now, updated_at=now,
+            id=TENANT_ID,
+            name="Test Corp",
+            slug="test-corp",
+            is_active=True,
+            settings={},
+            created_at=now,
+            updated_at=now,
         )
 
         with (

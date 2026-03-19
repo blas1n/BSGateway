@@ -7,7 +7,13 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_audit_service, get_cache, get_pool, require_admin
+from bsgateway.api.deps import (
+    AuthContext,
+    get_audit_service,
+    get_cache,
+    get_pool,
+    require_tenant_access,
+)
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.rules.engine import RuleEngine
 from bsgateway.rules.models import (
@@ -130,7 +136,7 @@ async def create_rule(
     tenant_id: UUID,
     body: RuleCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
     await _validate_target_model(request, tenant_id, body.target_model, body.is_default)
     repo = _get_repo(request)
@@ -153,8 +159,11 @@ async def create_rule(
 
     audit = get_audit_service(request)
     await audit.record(
-        tenant_id, _auth.key_hash or "superadmin",
-        "rule.created", "rule", str(row["id"]),
+        tenant_id,
+        _auth.key_hash or "superadmin",
+        "rule.created",
+        "rule",
+        str(row["id"]),
         {"name": body.name, "target_model": body.target_model},
     )
 
@@ -166,7 +175,7 @@ async def reorder_rules(
     tenant_id: UUID,
     body: ReorderRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     await repo.reorder_rules(tenant_id, body.priorities)
@@ -182,7 +191,7 @@ async def test_rules(
     tenant_id: UUID,
     body: RuleTestRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleTestResponse:
     """Test which rule would match for a given request."""
     repo = _get_repo(request)
@@ -229,11 +238,7 @@ async def test_rules(
     data = {"messages": body.messages, "model": body.model}
 
     # Check if any rule uses intent conditions
-    has_intent_conditions = any(
-        c.condition_type == "intent"
-        for r in rules
-        for c in r.conditions
-    )
+    has_intent_conditions = any(c.condition_type == "intent" for r in rules for c in r.conditions)
 
     engine = RuleEngine()
     match = await engine.evaluate(data, tenant_config)
@@ -260,8 +265,7 @@ async def test_rules(
         ),
         target_model=match.target_model if match else None,
         evaluation_trace=(
-            (match.trace or [])
-            + ([{"warning": intent_warning}] if intent_warning else [])
+            (match.trace or []) + ([{"warning": intent_warning}] if intent_warning else [])
             if match
             else ([{"warning": intent_warning}] if intent_warning else [])
         ),
@@ -286,7 +290,7 @@ async def test_rules(
 async def list_rules(
     tenant_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[RuleResponse]:
     repo = _get_repo(request)
     rows = await repo.list_rules(tenant_id)
@@ -298,7 +302,7 @@ async def get_rule(
     tenant_id: UUID,
     rule_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
     repo = _get_repo(request)
     row = await repo.get_rule(rule_id, tenant_id)
@@ -313,7 +317,7 @@ async def update_rule(
     rule_id: UUID,
     body: RuleUpdate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
     repo = _get_repo(request)
     existing = await repo.get_rule(rule_id, tenant_id)
@@ -321,9 +325,7 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="Rule not found")
 
     final_target = body.target_model or existing["target_model"]
-    final_is_default = (
-        body.is_default if body.is_default is not None else existing["is_default"]
-    )
+    final_is_default = body.is_default if body.is_default is not None else existing["is_default"]
     await _validate_target_model(request, tenant_id, final_target, final_is_default)
 
     row = await repo.update_rule(
@@ -331,9 +333,7 @@ async def update_rule(
         tenant_id=tenant_id,
         name=body.name or existing["name"],
         priority=body.priority if body.priority is not None else existing["priority"],
-        is_default=(
-            body.is_default if body.is_default is not None else existing["is_default"]
-        ),
+        is_default=(body.is_default if body.is_default is not None else existing["is_default"]),
         target_model=body.target_model or existing["target_model"],
     )
     if not row:
@@ -353,12 +353,15 @@ async def delete_rule(
     tenant_id: UUID,
     rule_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     await repo.delete_rule(rule_id, tenant_id)
     audit = get_audit_service(request)
     await audit.record(
-        tenant_id, _auth.key_hash or "superadmin",
-        "rule.deleted", "rule", str(rule_id),
+        tenant_id,
+        _auth.key_hash or "superadmin",
+        "rule.deleted",
+        "rule",
+        str(rule_id),
     )

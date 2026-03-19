@@ -35,6 +35,7 @@ def _get_custom_logger_base():
     global _CustomLogger
     if _CustomLogger is None:
         from litellm.integrations.custom_logger import CustomLogger
+
         _CustomLogger = CustomLogger
     return _CustomLogger
 
@@ -42,7 +43,7 @@ def _get_custom_logger_base():
 def _resolve_env(value: str) -> str:
     """Resolve ``os.environ/VAR`` references, matching LiteLLM's convention."""
     if isinstance(value, str) and value.startswith("os.environ/"):
-        var = value[len("os.environ/"):]
+        var = value[len("os.environ/") :]
         return os.environ.get(var, value)
     return value
 
@@ -54,9 +55,7 @@ def load_routing_config(config_path: str | None = None) -> RoutingConfig:
     ``passthrough_models`` is auto-derived from ``model_list[].model_name``
     so that adding a model only requires editing one place.
     """
-    path = config_path or os.environ.get(
-        "GATEWAY_CONFIG_PATH", "gateway.yaml"
-    )
+    path = config_path or os.environ.get("GATEWAY_CONFIG_PATH", "gateway.yaml")
     try:
         with open(path) as f:
             raw = yaml.safe_load(f)
@@ -70,11 +69,13 @@ def load_routing_config(config_path: str | None = None) -> RoutingConfig:
     tiers: list[TierConfig] = []
     for name, tier_data in routing.get("tiers", {}).items():
         score_range = tier_data.get("score_range", [0, 100])
-        tiers.append(TierConfig(
-            name=name,
-            score_range=(score_range[0], score_range[1]),
-            model=tier_data["model"],
-        ))
+        tiers.append(
+            TierConfig(
+                name=name,
+                score_range=(score_range[0], score_range[1]),
+                model=tier_data["model"],
+            )
+        )
 
     # Parse aliases
     aliases = routing.get("aliases", {})
@@ -121,7 +122,9 @@ def load_routing_config(config_path: str | None = None) -> RoutingConfig:
     embedding_raw = collector_raw.get("embedding")
     if embedding_raw:
         embedding_config = EmbeddingConfig(
-            api_base=_resolve_env(embedding_raw.get("api_base", "http://host.docker.internal:11434")),
+            api_base=_resolve_env(
+                embedding_raw.get("api_base", "http://host.docker.internal:11434")
+            ),
             model=embedding_raw.get("model", "nomic-embed-text"),
             timeout=embedding_raw.get("timeout", 5.0),
             max_chars=embedding_raw.get("max_chars", 1000),
@@ -247,14 +250,9 @@ class BSGatewayRouter:
 
     def _matches_auto_route_pattern(self, model: str) -> bool:
         """Check if a model name matches any auto_route_patterns."""
-        return any(
-            fnmatch(model, pattern)
-            for pattern in self.config.auto_route_patterns
-        )
+        return any(fnmatch(model, pattern) for pattern in self.config.auto_route_patterns)
 
-    async def _auto_route(
-        self, requested_model: str, data: dict
-    ) -> RoutingDecision:
+    async def _auto_route(self, requested_model: str, data: dict) -> RoutingDecision:
         """Classify complexity and select the appropriate tier model."""
         try:
             result = await self.classifier.classify(data)

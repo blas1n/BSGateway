@@ -1,4 +1,5 @@
 """Tests for rules and intents API endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -47,8 +48,12 @@ def admin_headers() -> dict:
 
 
 def _rule_row(
-    tenant_id=None, rule_id=None, name="test-rule",
-    priority=1, is_default=False, target="gpt-4o",
+    tenant_id=None,
+    rule_id=None,
+    name="test-rule",
+    priority=1,
+    is_default=False,
+    target="gpt-4o",
 ):
     now = datetime.now(UTC)
     return {
@@ -158,7 +163,9 @@ class TestRulesCRUD:
             assert "not registered" in resp.json()["detail"]
 
     def test_create_default_rule_skips_model_validation(
-        self, client: TestClient, admin_headers: dict,
+        self,
+        client: TestClient,
+        admin_headers: dict,
     ):
         tid = uuid4()
         row = _rule_row(tenant_id=tid, is_default=True, target="fallback-model")
@@ -201,7 +208,8 @@ class TestRulesCRUD:
             ),
         ):
             resp = client.get(
-                f"/api/v1/tenants/{tid}/rules", headers=admin_headers,
+                f"/api/v1/tenants/{tid}/rules",
+                headers=admin_headers,
             )
             assert resp.status_code == 200
             assert len(resp.json()) == 1
@@ -264,9 +272,7 @@ class TestRuleTest:
             resp = client.post(
                 f"/api/v1/tenants/{tid}/rules/test",
                 json={
-                    "messages": [
-                        {"role": "user", "content": "Hello world"}
-                    ],
+                    "messages": [{"role": "user", "content": "Hello world"}],
                     "model": "auto",
                 },
                 headers=admin_headers,

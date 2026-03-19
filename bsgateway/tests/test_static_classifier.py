@@ -21,13 +21,26 @@ def config() -> ClassifierConfig:
         weights=ClassifierWeights(),
         token_thresholds={"low": 500, "medium": 2000, "high": 8000},
         complex_keywords=[
-            "architect", "design system", "trade-off", "security audit",
-            "refactor", "optimize", "deep analysis", "implement", "function",
-            "build", "create",
+            "architect",
+            "design system",
+            "trade-off",
+            "security audit",
+            "refactor",
+            "optimize",
+            "deep analysis",
+            "implement",
+            "function",
+            "build",
+            "create",
         ],
         simple_keywords=[
-            "hello", "thanks", "convert", "format", "translate",
-            "what is", "how to",
+            "hello",
+            "thanks",
+            "convert",
+            "format",
+            "translate",
+            "what is",
+            "how to",
         ],
     )
 
@@ -64,11 +77,14 @@ class TestComplexRequests:
     async def test_architecture_design_scores_high(self, classifier: StaticClassifier) -> None:
         data = {
             "messages": [
-                {"role": "user", "content": (
-                    "Design a microservices architecture for an e-commerce platform. "
-                    "Consider trade-off between consistency and availability. "
-                    "Include security audit recommendations."
-                )}
+                {
+                    "role": "user",
+                    "content": (
+                        "Design a microservices architecture for an e-commerce platform. "
+                        "Consider trade-off between consistency and availability. "
+                        "Include security audit recommendations."
+                    ),
+                }
             ],
         }
         result = await classifier.classify(data)
@@ -111,10 +127,13 @@ class TestMediumRequests:
     async def test_moderate_code_generation(self, classifier: StaticClassifier) -> None:
         data = {
             "messages": [
-                {"role": "user", "content": (
-                    "Write a Python function that reads a CSV file, "
-                    "filters rows by date range, and outputs a summary."
-                )}
+                {
+                    "role": "user",
+                    "content": (
+                        "Write a Python function that reads a CSV file, "
+                        "filters rows by date range, and outputs a summary."
+                    ),
+                }
             ],
         }
         result = await classifier.classify(data)
@@ -172,15 +191,18 @@ class TestErrorTraces:
     async def test_error_in_code_boosts_score(self, classifier: StaticClassifier) -> None:
         data = {
             "messages": [
-                {"role": "user", "content": (
-                    "Fix this error:\n"
-                    "```\n"
-                    "Traceback (most recent call last):\n"
-                    "  File 'app.py', line 42\n"
-                    "    raise ValueError('bad input')\n"
-                    "ValueError: bad input\n"
-                    "```"
-                )}
+                {
+                    "role": "user",
+                    "content": (
+                        "Fix this error:\n"
+                        "```\n"
+                        "Traceback (most recent call last):\n"
+                        "  File 'app.py', line 42\n"
+                        "    raise ValueError('bad input')\n"
+                        "ValueError: bad input\n"
+                        "```"
+                    ),
+                }
             ],
         }
         result = await classifier.classify(data)

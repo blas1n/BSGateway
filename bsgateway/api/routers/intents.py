@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_admin
+from bsgateway.api.deps import AuthContext, get_pool, require_tenant_access
 from bsgateway.rules.repository import RulesRepository
 from bsgateway.rules.schemas import (
     ExampleCreate,
@@ -45,7 +45,7 @@ async def create_intent(
     tenant_id: UUID,
     body: IntentCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> IntentResponse:
     repo = _get_repo(request)
     row = await repo.create_intent(
@@ -67,7 +67,7 @@ async def create_intent(
 async def list_intents(
     tenant_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[IntentResponse]:
     repo = _get_repo(request)
     rows = await repo.list_intents(tenant_id)
@@ -79,7 +79,7 @@ async def get_intent(
     tenant_id: UUID,
     intent_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> IntentResponse:
     repo = _get_repo(request)
     row = await repo.get_intent(intent_id, tenant_id)
@@ -94,7 +94,7 @@ async def update_intent(
     intent_id: UUID,
     body: IntentUpdate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> IntentResponse:
     repo = _get_repo(request)
     existing = await repo.get_intent(intent_id, tenant_id)
@@ -105,16 +105,8 @@ async def update_intent(
         intent_id=intent_id,
         tenant_id=tenant_id,
         name=body.name or existing["name"],
-        description=(
-            body.description
-            if body.description is not None
-            else existing["description"]
-        ),
-        threshold=(
-            body.threshold
-            if body.threshold is not None
-            else existing["threshold"]
-        ),
+        description=(body.description if body.description is not None else existing["description"]),
+        threshold=(body.threshold if body.threshold is not None else existing["threshold"]),
     )
     if not row:
         raise HTTPException(status_code=404, detail="Intent not found")
@@ -126,7 +118,7 @@ async def delete_intent(
     tenant_id: UUID,
     intent_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     await repo.delete_intent(intent_id, tenant_id)
@@ -148,7 +140,7 @@ async def add_example(
     intent_id: UUID,
     body: ExampleCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> ExampleResponse:
     repo = _get_repo(request)
     # Verify intent belongs to tenant
@@ -175,7 +167,7 @@ async def delete_example(
     intent_id: UUID,
     example_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     intent = await repo.get_intent(intent_id, tenant_id)
@@ -189,7 +181,7 @@ async def list_examples(
     tenant_id: UUID,
     intent_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[ExampleResponse]:
     repo = _get_repo(request)
     # Verify intent belongs to tenant

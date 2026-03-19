@@ -30,9 +30,7 @@ class Settings(BaseSettings):
     # Development seed data (creates test tenant + API key on startup)
     seed_dev_data: bool = False
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
     def encryption_key_bytes(self) -> bytes:

@@ -141,12 +141,19 @@ def get_audit_service(request: Request):
     return AuditService(AuditRepository(pool))
 
 
+_SUPERADMIN_UUID = UUID("00000000-0000-0000-0000-000000000000")
+
+
 def require_tenant_access(
     tenant_id: UUID,
     auth: AuthContext = Depends(get_auth_context),
 ) -> AuthContext:
-    """Verify the authenticated tenant matches the requested tenant_id."""
-    if "admin" in auth.scopes:
+    """Verify the authenticated tenant matches the requested tenant_id.
+
+    Superadmin (UUID 00000000-...) may access any tenant.
+    All other callers must own the requested tenant_id.
+    """
+    if auth.tenant_id == _SUPERADMIN_UUID:
         return auth
     if auth.tenant_id != tenant_id:
         raise HTTPException(

@@ -2,6 +2,7 @@
 
 TDD: Tests written FIRST.
 """
+
 from __future__ import annotations
 
 import math
@@ -67,45 +68,63 @@ class TestIntentClassifier:
         ]
 
     async def test_classify_matches_correct_intent(
-        self, mock_embedder: AsyncMock, intents: list[IntentDefinition],
+        self,
+        mock_embedder: AsyncMock,
+        intents: list[IntentDefinition],
     ):
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=intents, threshold=0.5,
+            embed_fn=mock_embedder,
+            intents=intents,
+            threshold=0.5,
         )
         result = await classifier.classify("상품 추천해줘")
         assert result == "product_recommendation"
 
     async def test_classify_different_intent(
-        self, mock_embedder: AsyncMock, intents: list[IntentDefinition],
+        self,
+        mock_embedder: AsyncMock,
+        intents: list[IntentDefinition],
     ):
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=intents, threshold=0.5,
+            embed_fn=mock_embedder,
+            intents=intents,
+            threshold=0.5,
         )
         result = await classifier.classify("주문 상태 확인")
         assert result == "order_status"
 
     async def test_classify_returns_none_below_threshold(
-        self, mock_embedder: AsyncMock, intents: list[IntentDefinition],
+        self,
+        mock_embedder: AsyncMock,
+        intents: list[IntentDefinition],
     ):
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=intents, threshold=0.99,
+            embed_fn=mock_embedder,
+            intents=intents,
+            threshold=0.99,
         )
         # "hello" doesn't match any intent well
         result = await classifier.classify("hello world")
         assert result is None
 
     async def test_classify_empty_text(
-        self, mock_embedder: AsyncMock, intents: list[IntentDefinition],
+        self,
+        mock_embedder: AsyncMock,
+        intents: list[IntentDefinition],
     ):
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=intents, threshold=0.5,
+            embed_fn=mock_embedder,
+            intents=intents,
+            threshold=0.5,
         )
         result = await classifier.classify("")
         assert result is None
 
     async def test_classify_no_intents(self, mock_embedder: AsyncMock):
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=[], threshold=0.5,
+            embed_fn=mock_embedder,
+            intents=[],
+            threshold=0.5,
         )
         result = await classifier.classify("anything")
         assert result is None
@@ -133,7 +152,9 @@ class TestIntentClassifier:
             ),
         ]
         classifier = IntentClassifier(
-            embed_fn=mock_embedder, intents=intents, threshold=0.5,
+            embed_fn=mock_embedder,
+            intents=intents,
+            threshold=0.5,
         )
         result = await classifier.classify("상품 추천해줘")
         assert result == "recommendation"

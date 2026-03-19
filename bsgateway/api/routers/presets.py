@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_admin
+from bsgateway.api.deps import AuthContext, get_pool, require_admin, require_tenant_access
 from bsgateway.presets.models import PresetApplyRequest
 from bsgateway.presets.registry import PresetRegistry
 from bsgateway.presets.schemas import PresetApplyResponse, PresetSummary
@@ -43,7 +43,7 @@ async def apply_preset(
     tenant_id: UUID,
     body: PresetApplyRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> PresetApplyResponse:
     """Apply a preset template to a tenant."""
     pool = get_pool(request)

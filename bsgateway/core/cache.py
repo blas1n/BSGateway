@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 import redis.asyncio as redis
 import structlog
@@ -27,7 +28,7 @@ class CacheManager:
             if value is None:
                 return None
             return json.loads(value)
-        except Exception as e:
+        except Exception:
             logger.warning("cache_get_failed", key=key, exc_info=True)
             return None
 
@@ -45,7 +46,7 @@ class CacheManager:
             else:
                 await self._redis.set(key, serialized)
             return True
-        except Exception as e:
+        except Exception:
             logger.warning("cache_set_failed", key=key, exc_info=True)
             return False
 
@@ -56,7 +57,7 @@ class CacheManager:
             if keys:
                 await self._redis.delete(*keys)
             return True
-        except Exception as e:
+        except Exception:
             logger.warning("cache_delete_failed", exc_info=True)
             return False
 
@@ -92,7 +93,7 @@ class CacheManager:
         """Increment integer value (for counters)."""
         try:
             return await self._redis.incrby(key, amount)
-        except Exception as e:
+        except Exception:
             logger.warning("cache_increment_failed", key=key, exc_info=True)
             return 0
 

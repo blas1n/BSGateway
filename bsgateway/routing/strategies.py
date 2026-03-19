@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
-from typing import Protocol
 
 import structlog
 
@@ -87,7 +87,9 @@ class ABTester:
         self.tests = tests
 
     def select_variant(
-        self, test_id: str, user_id: str | None = None,
+        self,
+        test_id: str,
+        user_id: str | None = None,
     ) -> ABTestConfig | None:
         """Select variant for user in test.
 
@@ -101,8 +103,8 @@ class ABTester:
         if not user_id:
             return self._weighted_choice(variants)
 
-        # Deterministic assignment based on user_id hash
-        hash_val = hash(user_id) % 100
+        # Deterministic assignment based on user_id hash (hashlib for stability across restarts)
+        hash_val = int(hashlib.sha256(user_id.encode()).hexdigest(), 16) % 100
         cumulative = 0
         for variant in variants:
             cumulative += variant.traffic_percentage

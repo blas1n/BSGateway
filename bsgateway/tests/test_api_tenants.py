@@ -2,6 +2,7 @@
 
 Uses FastAPI TestClient with mocked database pool.
 """
+
 from __future__ import annotations
 
 import os

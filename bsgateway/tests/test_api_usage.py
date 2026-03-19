@@ -1,4 +1,5 @@
 """Tests for the usage dashboard API endpoint."""
+
 from __future__ import annotations
 
 import os
@@ -159,8 +160,7 @@ class TestUsageAPI:
         with patch("bsgateway.api.routers.usage._sql") as mock_sql:
             mock_sql.query.side_effect = lambda q: q
             resp = client.get(
-                f"/api/v1/tenants/{TENANT_ID}/usage"
-                "?from=2024-01-01&to=2024-01-31",
+                f"/api/v1/tenants/{TENANT_ID}/usage?from=2024-01-01&to=2024-01-31",
                 headers=admin_headers,
             )
 

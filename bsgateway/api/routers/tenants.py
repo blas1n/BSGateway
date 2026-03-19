@@ -11,6 +11,7 @@ from bsgateway.api.deps import (
     get_encryption_key,
     get_pool,
     require_admin,
+    require_tenant_access,
 )
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.tenant.models import (
@@ -62,8 +63,11 @@ async def create_tenant(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message) from e
     audit = get_audit_service(request)
     await audit.record(
-        result.id, _auth.key_hash or "superadmin",
-        "tenant.created", "tenant", str(result.id),
+        result.id,
+        _auth.key_hash or "superadmin",
+        "tenant.created",
+        "tenant",
+        str(result.id),
         {"name": body.name, "slug": body.slug},
     )
     return result
@@ -126,8 +130,11 @@ async def deactivate_tenant(
     await svc.deactivate_tenant(tenant_id)
     audit = get_audit_service(request)
     await audit.record(
-        tenant_id, _auth.key_hash or "superadmin",
-        "tenant.deactivated", "tenant", str(tenant_id),
+        tenant_id,
+        _auth.key_hash or "superadmin",
+        "tenant.deactivated",
+        "tenant",
+        str(tenant_id),
     )
 
 
@@ -146,7 +153,7 @@ async def create_api_key(
     tenant_id: UUID,
     body: ApiKeyCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> ApiKeyCreatedResponse:
     svc = get_tenant_service(request)
     tenant = await svc.get_tenant(tenant_id)
@@ -159,7 +166,7 @@ async def create_api_key(
 async def list_api_keys(
     tenant_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[ApiKeyResponse]:
     svc = get_tenant_service(request)
     return await svc.list_api_keys(tenant_id)
@@ -174,7 +181,7 @@ async def revoke_api_key(
     tenant_id: UUID,
     key_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     svc = get_tenant_service(request)
     await svc.revoke_api_key(key_id, tenant_id)
@@ -195,7 +202,7 @@ async def create_model(
     tenant_id: UUID,
     body: TenantModelCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> TenantModelResponse:
     svc = get_tenant_service(request)
     try:
@@ -207,8 +214,11 @@ async def create_model(
     audit = get_audit_service(request)
     provider = body.litellm_model.split("/")[0] if "/" in body.litellm_model else "unknown"
     await audit.record(
-        tenant_id, _auth.key_hash or "superadmin",
-        "model.created", "model", str(result.id),
+        tenant_id,
+        _auth.key_hash or "superadmin",
+        "model.created",
+        "model",
+        str(result.id),
         {"model_name": body.model_name, "provider": provider},
     )
     return result
@@ -218,7 +228,7 @@ async def create_model(
 async def list_models(
     tenant_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[TenantModelResponse]:
     svc = get_tenant_service(request)
     return await svc.list_models(tenant_id)
@@ -233,7 +243,7 @@ async def get_model(
     tenant_id: UUID,
     model_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> TenantModelResponse:
     svc = get_tenant_service(request)
     model = await svc.get_model(model_id, tenant_id)
@@ -252,7 +262,7 @@ async def update_model(
     model_id: UUID,
     body: TenantModelUpdate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> TenantModelResponse:
     svc = get_tenant_service(request)
     try:
@@ -273,12 +283,15 @@ async def delete_model(
     tenant_id: UUID,
     model_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     svc = get_tenant_service(request)
     await svc.delete_model(model_id, tenant_id)
     audit = get_audit_service(request)
     await audit.record(
-        tenant_id, _auth.key_hash or "superadmin",
-        "model.deleted", "model", str(model_id),
+        tenant_id,
+        _auth.key_hash or "superadmin",
+        "model.deleted",
+        "model",
+        str(model_id),
     )

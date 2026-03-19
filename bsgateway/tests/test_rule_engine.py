@@ -2,6 +2,7 @@
 
 TDD: These tests are written FIRST, before any production code.
 """
+
 from __future__ import annotations
 
 from bsgateway.rules.models import (
@@ -300,16 +301,19 @@ class TestRuleEngine:
     """Test the full rule evaluation pipeline."""
 
     def _make_tenant_config(
-        self, rules: list[RoutingRule],
+        self,
+        rules: list[RoutingRule],
     ) -> TenantConfig:
         return TenantConfig(
             tenant_id="test-tenant",
             slug="test",
-            models={"gpt4": TenantModel(
-                model_name="gpt4",
-                provider="openai",
-                litellm_model="openai/gpt-4o",
-            )},
+            models={
+                "gpt4": TenantModel(
+                    model_name="gpt4",
+                    provider="openai",
+                    litellm_model="openai/gpt-4o",
+                )
+            },
             rules=rules,
             settings={},
         )
@@ -326,12 +330,14 @@ class TestRuleEngine:
                 is_active=True,
                 is_default=False,
                 target_model="premium",
-                conditions=[RuleCondition(
-                    condition_type="token_count",
-                    field="estimated_tokens",
-                    operator="gt",
-                    value=1000,
-                )],
+                conditions=[
+                    RuleCondition(
+                        condition_type="token_count",
+                        field="estimated_tokens",
+                        operator="gt",
+                        value=1000,
+                    )
+                ],
             ),
             RoutingRule(
                 id="rule-2",
@@ -341,12 +347,14 @@ class TestRuleEngine:
                 is_active=True,
                 is_default=False,
                 target_model="economy",
-                conditions=[RuleCondition(
-                    condition_type="token_count",
-                    field="estimated_tokens",
-                    operator="gt",
-                    value=0,
-                )],
+                conditions=[
+                    RuleCondition(
+                        condition_type="token_count",
+                        field="estimated_tokens",
+                        operator="gt",
+                        value=0,
+                    )
+                ],
             ),
         ]
         config = self._make_tenant_config(rules)
@@ -373,12 +381,14 @@ class TestRuleEngine:
                 is_active=True,
                 is_default=False,
                 target_model="premium",
-                conditions=[RuleCondition(
-                    condition_type="text_pattern",
-                    field="user_text",
-                    operator="contains",
-                    value="```",
-                )],
+                conditions=[
+                    RuleCondition(
+                        condition_type="text_pattern",
+                        field="user_text",
+                        operator="contains",
+                        value="```",
+                    )
+                ],
             ),
             RoutingRule(
                 id="rule-default",
@@ -514,12 +524,14 @@ class TestRuleEngine:
                 is_active=True,
                 is_default=False,
                 target_model="premium",
-                conditions=[RuleCondition(
-                    condition_type="text_pattern",
-                    field="user_text",
-                    operator="contains",
-                    value="```",
-                )],
+                conditions=[
+                    RuleCondition(
+                        condition_type="text_pattern",
+                        field="user_text",
+                        operator="contains",
+                        value="```",
+                    )
+                ],
             ),
             RoutingRule(
                 id="rule-default",

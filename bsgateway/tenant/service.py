@@ -78,7 +78,10 @@ class TenantService:
     # -- Tenants --
 
     async def create_tenant(
-        self, name: str, slug: str, settings: dict | None = None,
+        self,
+        name: str,
+        slug: str,
+        settings: dict | None = None,
     ) -> TenantResponse:
         row = await self._repo.create_tenant(name, slug, settings)
         logger.info("tenant_created", tenant_id=str(row["id"]), slug=slug)
@@ -93,7 +96,11 @@ class TenantService:
         return [_record_to_tenant(r) for r in rows]
 
     async def update_tenant(
-        self, tenant_id: UUID, name: str, slug: str, settings: dict,
+        self,
+        tenant_id: UUID,
+        name: str,
+        slug: str,
+        settings: dict,
     ) -> TenantResponse | None:
         row = await self._repo.update_tenant(tenant_id, name, slug, settings)
         if row:
@@ -107,7 +114,10 @@ class TenantService:
     # -- API Keys --
 
     async def create_api_key(
-        self, tenant_id: UUID, name: str = "", scopes: list[str] | None = None,
+        self,
+        tenant_id: UUID,
+        name: str = "",
+        scopes: list[str] | None = None,
     ) -> ApiKeyCreatedResponse:
         plaintext_key, prefix = generate_api_key()
         key_hash = hash_api_key(plaintext_key)
@@ -147,15 +157,15 @@ class TenantService:
     # -- Tenant Models --
 
     async def create_model(
-        self, tenant_id: UUID, data: TenantModelCreate,
+        self,
+        tenant_id: UUID,
+        data: TenantModelCreate,
     ) -> TenantModelResponse:
         encrypted_key = None
         if data.api_key and self._encryption_key:
             encrypted_key = encrypt_value(data.api_key, self._encryption_key)
         elif data.api_key:
-            raise ValueError(
-                "ENCRYPTION_KEY is required to store provider API keys"
-            )
+            raise ValueError("ENCRYPTION_KEY is required to store provider API keys")
 
         provider = data.litellm_model.split("/")[0] if "/" in data.litellm_model else "unknown"
 
@@ -192,17 +202,13 @@ class TenantService:
         encrypted_key = existing["api_key_encrypted"]
         if data.api_key is not None:
             if not self._encryption_key:
-                raise ValueError(
-                    "ENCRYPTION_KEY is required to store provider API keys"
-                )
+                raise ValueError("ENCRYPTION_KEY is required to store provider API keys")
             encrypted_key = encrypt_value(data.api_key, self._encryption_key)
 
         existing_extra = _safe_json_loads(existing["extra_params"])
 
         new_litellm_model = data.litellm_model or existing["litellm_model"]
-        new_provider = (
-            new_litellm_model.split("/")[0] if "/" in new_litellm_model else "unknown"
-        )
+        new_provider = new_litellm_model.split("/")[0] if "/" in new_litellm_model else "unknown"
 
         row = await self._repo.update_model(
             model_id=model_id,

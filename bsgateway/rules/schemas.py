@@ -11,14 +11,28 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # ---------------------------------------------------------------------------
 
 ValidOperator = Literal[
-    "eq", "contains", "regex",
-    "gt", "lt", "gte", "lte", "between",
-    "in", "not_in",
+    "eq",
+    "contains",
+    "regex",
+    "gt",
+    "lt",
+    "gte",
+    "lte",
+    "between",
+    "in",
+    "not_in",
 ]
 
 ValidConditionType = Literal[
-    "text_pattern", "token_count", "message", "tool",
-    "intent", "model_requested", "language", "time", "budget",
+    "text_pattern",
+    "token_count",
+    "message",
+    "tool",
+    "intent",
+    "model_requested",
+    "language",
+    "time",
+    "budget",
 ]
 
 ConditionValue = str | int | float | bool | list | None
@@ -56,9 +70,7 @@ class ConditionSchema(BaseModel):
     def validate_between_value(self) -> ConditionSchema:
         if self.operator == "between":
             if not isinstance(self.value, list) or len(self.value) != 2:
-                raise ValueError(
-                    "'between' operator requires a 2-element list"
-                )
+                raise ValueError("'between' operator requires a 2-element list")
         return self
 
 

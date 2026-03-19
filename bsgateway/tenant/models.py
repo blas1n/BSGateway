@@ -11,9 +11,7 @@ from pydantic import BaseModel, Field
 
 
 class TenantCreate(BaseModel):
-    name: str = Field(
-        ..., min_length=1, max_length=255, description="Human-readable tenant name"
-    )
+    name: str = Field(..., min_length=1, max_length=255, description="Human-readable tenant name")
     slug: str = Field(
         ...,
         min_length=1,
@@ -137,9 +135,7 @@ class TenantModelCreate(BaseModel):
     api_base: str | None = Field(
         None, description="Custom API base URL for non-standard endpoints (optional)"
     )
-    extra_params: dict = Field(
-        default_factory=dict, description="Additional LiteLLM parameters"
-    )
+    extra_params: dict = Field(default_factory=dict, description="Additional LiteLLM parameters")
 
     model_config = {
         "json_schema_extra": {

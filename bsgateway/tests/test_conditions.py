@@ -1,4 +1,5 @@
 """Tests for condition evaluation edge cases: ReDoS, between safety, validation."""
+
 from __future__ import annotations
 
 import pytest

@@ -150,14 +150,10 @@ class RoutingCollector:
         code_blocks = re.findall(r"```[\s\S]*?```", all_text)
         return {
             "token_count": int(len(all_text.split()) * 1.3),
-            "conversation_turns": len(
-                [m for m in messages if m.get("role") == "user"]
-            ),
+            "conversation_turns": len([m for m in messages if m.get("role") == "user"]),
             "code_block_count": len(code_blocks),
             "code_lines": sum(b.count("\n") for b in code_blocks),
-            "has_error_trace": any(
-                p in all_text for p in ["Traceback", "Error:", "Exception"]
-            ),
+            "has_error_trace": any(p in all_text for p in ["Traceback", "Error:", "Exception"]),
             "tool_count": len(data.get("tools", [])),
         }
 

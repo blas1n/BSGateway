@@ -1,4 +1,5 @@
 """Tests for presets and feedback API endpoints."""
+
 from __future__ import annotations
 
 import os
@@ -94,7 +95,9 @@ class TestPresetsAPI:
             json={
                 "preset_name": "nonexistent",
                 "model_mapping": {
-                    "economy": "a", "balanced": "b", "premium": "c",
+                    "economy": "a",
+                    "balanced": "b",
+                    "premium": "c",
                 },
             },
             headers=HEADERS,
@@ -108,7 +111,9 @@ class TestPresetsAPI:
             json={
                 "preset_name": "general",
                 "model_mapping": {
-                    "economy": "a", "balanced": "b", "premium": "c",
+                    "economy": "a",
+                    "balanced": "b",
+                    "premium": "c",
                 },
             },
         )
@@ -124,9 +129,11 @@ class TestFeedbackAPI:
             "bsgateway.presets.repository.FeedbackRepository.create_feedback",
             new_callable=AsyncMock,
             return_value={
-                "id": uuid4(), "tenant_id": tid,
+                "id": uuid4(),
+                "tenant_id": tid,
                 "routing_id": "route-123",
-                "rating": 4, "comment": "Good",
+                "rating": 4,
+                "comment": "Good",
                 "created_at": now,
             },
         ):
@@ -162,9 +169,12 @@ class TestFeedbackAPI:
             new_callable=AsyncMock,
             return_value=[
                 {
-                    "id": uuid4(), "tenant_id": tid,
-                    "routing_id": "r-1", "rating": 5,
-                    "comment": "", "created_at": now,
+                    "id": uuid4(),
+                    "tenant_id": tid,
+                    "routing_id": "r-1",
+                    "rating": 5,
+                    "comment": "",
+                    "created_at": now,
                 }
             ],
         ):

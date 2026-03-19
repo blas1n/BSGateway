@@ -1,4 +1,5 @@
 """Tests for the rate limiter."""
+
 from __future__ import annotations
 
 import os
@@ -186,7 +187,10 @@ class TestRateLimitAPI:
                 "bsgateway.chat.ratelimit.RateLimiter.check",
                 new_callable=AsyncMock,
                 return_value=RateLimitResult(
-                    allowed=False, limit=5, remaining=0, reset_at=9999999999,
+                    allowed=False,
+                    limit=5,
+                    remaining=0,
+                    reset_at=9999999999,
                 ),
             ),
         ):

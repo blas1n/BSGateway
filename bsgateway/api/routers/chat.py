@@ -22,7 +22,10 @@ def _get_redis(request: Request) -> Any:
 
 
 def _error_response(
-    status_code: int, message: str, error_type: str, code: str | None = None,
+    status_code: int,
+    message: str,
+    error_type: str,
+    code: str | None = None,
 ) -> JSONResponse:
     """Return an OpenAI-compatible error response."""
     return JSONResponse(
@@ -57,8 +60,10 @@ async def chat_completions(
     # Validate messages
     if "messages" not in body or not body["messages"]:
         return _error_response(
-            400, "messages is required and must be non-empty",
-            "invalid_request_error", "invalid_messages",
+            400,
+            "messages is required and must be non-empty",
+            "invalid_request_error",
+            "invalid_messages",
         )
 
     pool = get_pool(request)
@@ -115,6 +120,7 @@ async def chat_completions(
 
     # Streaming response
     if body.get("stream"):
+
         async def event_stream():
             try:
                 async for chunk in response:

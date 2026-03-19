@@ -41,13 +41,16 @@ class UsageResponse(BaseModel):
 
 
 def _parse_period(
-    period: str, from_date: date | None, to_date: date | None,
+    period: str,
+    from_date: date | None,
+    to_date: date | None,
 ) -> tuple[datetime, datetime]:
     """Convert period + optional dates into a (start, end) datetime range."""
     today = date.today()
     if from_date and to_date:
         return datetime.combine(from_date, datetime.min.time()), datetime.combine(
-            to_date + timedelta(days=1), datetime.min.time(),
+            to_date + timedelta(days=1),
+            datetime.min.time(),
         )
     if period == "day":
         start = today
@@ -58,7 +61,8 @@ def _parse_period(
     else:
         start = today
     return datetime.combine(start, datetime.min.time()), datetime.combine(
-        today + timedelta(days=1), datetime.min.time(),
+        today + timedelta(days=1),
+        datetime.min.time(),
     )
 
 
@@ -77,13 +81,22 @@ async def get_usage(
 
     async with pool.acquire() as conn:
         total_row = await conn.fetchrow(
-            _sql.query("usage_total"), tenant_id, start, end,
+            _sql.query("usage_total"),
+            tenant_id,
+            start,
+            end,
         )
         model_rows = await conn.fetch(
-            _sql.query("usage_by_model"), tenant_id, start, end,
+            _sql.query("usage_by_model"),
+            tenant_id,
+            start,
+            end,
         )
         rule_rows = await conn.fetch(
-            _sql.query("usage_by_rule"), tenant_id, start, end,
+            _sql.query("usage_by_rule"),
+            tenant_id,
+            start,
+            end,
         )
 
     total_requests = total_row["total_requests"] if total_row else 0
@@ -103,15 +116,11 @@ async def get_usage(
         daily[day_str]["tokens"] += row["tokens"]
 
     by_model_resp = {
-        k: ModelUsage(requests=v["requests"], tokens=v["tokens"])
-        for k, v in by_model.items()
+        k: ModelUsage(requests=v["requests"], tokens=v["tokens"]) for k, v in by_model.items()
     }
 
     # Aggregate by rule
-    by_rule = {
-        (row["rule_name"] or str(row["rule_id"])): row["requests"]
-        for row in rule_rows
-    }
+    by_rule = {(row["rule_name"] or str(row["rule_id"])): row["requests"] for row in rule_rows}
 
     daily_breakdown = sorted(
         [

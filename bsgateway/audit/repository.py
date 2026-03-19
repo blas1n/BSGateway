@@ -28,10 +28,11 @@ class AuditRepository:
         schema_path = Path(__file__).parent.parent / "routing" / "sql" / "audit_schema.sql"
         schema_sql = schema_path.read_text()
         async with self._pool.acquire() as conn:
-            for stmt in schema_sql.split(";"):
-                stmt = stmt.strip()
-                if stmt:
-                    await conn.execute(stmt)
+            async with conn.transaction():
+                for stmt in schema_sql.split(";"):
+                    stmt = stmt.strip()
+                    if stmt:
+                        await conn.execute(stmt)
         logger.info("audit_schema_initialized")
 
     async def record(

@@ -68,7 +68,10 @@ class FeedbackRepository:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
                 sql.query("insert_feedback"),
-                tenant_id, routing_id, rating, comment,
+                tenant_id,
+                routing_id,
+                rating,
+                comment,
             )
 
     async def list_feedback(
@@ -79,11 +82,15 @@ class FeedbackRepository:
     ) -> list[asyncpg.Record]:
         async with self._pool.acquire() as conn:
             return await conn.fetch(
-                sql.query("list_feedback"), tenant_id, limit, offset,
+                sql.query("list_feedback"),
+                tenant_id,
+                limit,
+                offset,
             )
 
     async def get_stats(self, tenant_id: UUID) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
-                sql.query("get_feedback_stats"), tenant_id,
+                sql.query("get_feedback_stats"),
+                tenant_id,
             )

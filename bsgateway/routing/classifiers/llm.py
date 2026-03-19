@@ -34,9 +34,7 @@ class LLMClassifier:
     Falls back to the provided static classifier on any failure.
     """
 
-    def __init__(
-        self, config: LLMClassifierConfig, fallback: ClassifierProtocol
-    ) -> None:
+    def __init__(self, config: LLMClassifierConfig, fallback: ClassifierProtocol) -> None:
         self.config = config
         self.fallback = fallback
 
@@ -71,9 +69,7 @@ class LLMClassifier:
         system_context = ""
         if system_text:
             system_context = f"System context: {system_text}\n"
-        return CLASSIFICATION_PROMPT.format(
-            system_context=system_context, user_text=user_text
-        )
+        return CLASSIFICATION_PROMPT.format(system_context=system_context, user_text=user_text)
 
     @staticmethod
     def _parse_tier(raw: str) -> str:

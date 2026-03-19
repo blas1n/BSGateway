@@ -45,7 +45,8 @@ class RuleEngine:
         # Lazy intent classification: only if any rule needs it
         if intent_classifier and self._needs_intent(tenant_config.rules):
             ctx.classified_intent = await self._classify_intent(
-                intent_classifier, ctx,
+                intent_classifier,
+                ctx,
             )
 
         trace: list[dict] = []
@@ -86,23 +87,27 @@ class RuleEngine:
         """Check if all conditions of a rule match (AND logic)."""
         for cond in rule.conditions:
             if not evaluate_condition(cond, ctx):
-                trace.append({
-                    "rule": rule.name,
-                    "priority": rule.priority,
-                    "matched": False,
-                    "failed_condition": {
-                        "type": cond.condition_type,
-                        "field": cond.field,
-                        "operator": cond.operator,
-                    },
-                })
+                trace.append(
+                    {
+                        "rule": rule.name,
+                        "priority": rule.priority,
+                        "matched": False,
+                        "failed_condition": {
+                            "type": cond.condition_type,
+                            "field": cond.field,
+                            "operator": cond.operator,
+                        },
+                    }
+                )
                 return False
 
-        trace.append({
-            "rule": rule.name,
-            "priority": rule.priority,
-            "matched": True,
-        })
+        trace.append(
+            {
+                "rule": rule.name,
+                "priority": rule.priority,
+                "matched": True,
+            }
+        )
         return True
 
     @staticmethod
@@ -145,14 +150,11 @@ class RuleEngine:
             if texts_to_classify:
                 tasks = [intent_classifier.classify(text) for text in texts_to_classify]
                 results = await asyncio.gather(*tasks)
-                for (_, text), result in zip(text_indices, results):
+                for (_, text), result in zip(text_indices, results, strict=False):
                     intent_cache[text] = result
 
         # Evaluate all requests in parallel
-        tasks = [
-            self._evaluate_single(req, tenant_config, intent_cache)
-            for req in requests
-        ]
+        tasks = [self._evaluate_single(req, tenant_config, intent_cache) for req in requests]
         return await asyncio.gather(*tasks)
 
     async def _evaluate_single(
@@ -203,6 +205,7 @@ class RuleEngine:
 
     @staticmethod
     async def _classify_intent(
-        classifier: IntentClassifierProtocol, ctx: EvaluationContext,
+        classifier: IntentClassifierProtocol,
+        ctx: EvaluationContext,
     ) -> str | None:
         return await classifier.classify(ctx.user_text)

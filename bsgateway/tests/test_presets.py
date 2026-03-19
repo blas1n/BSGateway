@@ -2,6 +2,7 @@
 
 TDD: Tests written FIRST.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -117,7 +118,9 @@ class TestPresetService:
         return repo
 
     async def test_apply_preset(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         service = PresetService(mock_rules_repo, mock_tenant_repo)
         tid = uuid4()
@@ -139,7 +142,9 @@ class TestPresetService:
         assert result.intents_created > 0
 
     async def test_apply_preset_unknown(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         service = PresetService(mock_rules_repo, mock_tenant_repo)
         with pytest.raises(ValueError, match="Unknown preset"):
@@ -147,12 +152,16 @@ class TestPresetService:
                 tenant_id=uuid4(),
                 preset_name="nonexistent",
                 model_mapping=ModelMapping(
-                    economy="a", balanced="b", premium="c",
+                    economy="a",
+                    balanced="b",
+                    premium="c",
                 ),
             )
 
     async def test_apply_preset_idempotency(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         """Applying the same preset twice should fail with a clear error."""
         mock_rules_repo.list_intents.return_value = [

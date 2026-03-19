@@ -1,4 +1,5 @@
 """Tests for ChatService: model resolution, tenant config loading, litellm delegation."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -105,9 +106,7 @@ class TestResolveModel:
         svc = ChatService(_make_pool(), ENCRYPTION_KEY)
         config = _make_tenant_config()
 
-        with patch.object(
-            svc._engine, "evaluate", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(svc._engine, "evaluate", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = RuleMatch(
                 rule=config.rules[0],
                 target_model="gpt-4o",
@@ -132,20 +131,24 @@ class TestResolveModel:
     async def test_auto_rule_targets_unregistered_model(self):
         svc = ChatService(_make_pool(), ENCRYPTION_KEY)
         config = _make_tenant_config(
-            models={"gpt-4o": TenantModel(
-                model_name="gpt-4o", provider="openai",
-                litellm_model="openai/gpt-4o",
-            )},
+            models={
+                "gpt-4o": TenantModel(
+                    model_name="gpt-4o",
+                    provider="openai",
+                    litellm_model="openai/gpt-4o",
+                )
+            },
         )
 
-        with patch.object(
-            svc._engine, "evaluate", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(svc._engine, "evaluate", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = RuleMatch(
                 rule=RoutingRule(
-                    id=str(uuid4()), tenant_id=str(TENANT_ID),
-                    name="missing-target", priority=1,
-                    is_active=True, is_default=False,
+                    id=str(uuid4()),
+                    tenant_id=str(TENANT_ID),
+                    name="missing-target",
+                    priority=1,
+                    is_active=True,
+                    is_default=False,
                     target_model="nonexistent-model",
                 ),
                 target_model="nonexistent-model",
@@ -160,11 +163,10 @@ class TestResolveModel:
         svc = ChatService(_make_pool(), ENCRYPTION_KEY)
         config = _make_tenant_config()
 
-        with patch.object(
-            svc._engine, "evaluate", new_callable=AsyncMock
-        ) as mock_eval:
+        with patch.object(svc._engine, "evaluate", new_callable=AsyncMock) as mock_eval:
             mock_eval.return_value = RuleMatch(
-                rule=config.rules[0], target_model="gpt-4o",
+                rule=config.rules[0],
+                target_model="gpt-4o",
             )
             model, _match = await svc.resolve_model(
                 config, {"messages": [{"role": "user", "content": "test"}]}
@@ -192,7 +194,8 @@ class TestComplete:
         ):
             mock_load.return_value = _make_tenant_config()
             model = TenantModel(
-                model_name="gpt-4o", provider="openai",
+                model_name="gpt-4o",
+                provider="openai",
                 litellm_model="openai/gpt-4o",
                 api_key_encrypted="enc_key",
             )
@@ -216,7 +219,8 @@ class TestComplete:
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="sk-test-key"),
             patch(
-                "litellm.acompletion", new_callable=AsyncMock,
+                "litellm.acompletion",
+                new_callable=AsyncMock,
                 return_value=mock_response,
             ) as mock_acomp,
         ):
@@ -253,7 +257,8 @@ class TestComplete:
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="sk-key"),
             patch(
-                "litellm.acompletion", new_callable=AsyncMock,
+                "litellm.acompletion",
+                new_callable=AsyncMock,
                 return_value=mock_response,
             ) as mock_acomp,
         ):
@@ -283,13 +288,15 @@ class TestComplete:
             patch.object(svc, "load_tenant_config", new_callable=AsyncMock) as mock_load,
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch(
-                "litellm.acompletion", new_callable=AsyncMock,
+                "litellm.acompletion",
+                new_callable=AsyncMock,
                 return_value=mock_response,
             ) as mock_acomp,
         ):
             mock_load.return_value = _make_tenant_config()
             model = TenantModel(
-                model_name="local-llm", provider="ollama",
+                model_name="local-llm",
+                provider="ollama",
                 litellm_model="ollama/llama3",
                 api_key_encrypted=None,  # No key needed
             )
@@ -313,13 +320,15 @@ class TestComplete:
             patch.object(svc, "resolve_model", new_callable=AsyncMock) as mock_resolve,
             patch("bsgateway.chat.service.decrypt_value", return_value="key"),
             patch(
-                "litellm.acompletion", new_callable=AsyncMock,
+                "litellm.acompletion",
+                new_callable=AsyncMock,
                 return_value=mock_response,
             ) as mock_acomp,
         ):
             mock_load.return_value = _make_tenant_config()
             model = TenantModel(
-                model_name="custom", provider="openai",
+                model_name="custom",
+                provider="openai",
                 litellm_model="openai/gpt-4o",
                 api_key_encrypted="enc",
                 api_base="https://custom.api.com/v1",
@@ -427,10 +436,17 @@ class TestLoadTenantConfig:
 
         conn = AsyncMock()
         conn.fetch = AsyncMock(side_effect=[[], [], []])
-        conn.fetchrow = AsyncMock(return_value={
-            "id": TENANT_ID, "name": "Empty", "slug": "empty",
-            "is_active": True, "settings": "{}", "created_at": None, "updated_at": None,
-        })
+        conn.fetchrow = AsyncMock(
+            return_value={
+                "id": TENANT_ID,
+                "name": "Empty",
+                "slug": "empty",
+                "is_active": True,
+                "settings": "{}",
+                "created_at": None,
+                "updated_at": None,
+            }
+        )
 
         pool = AsyncMock()
 
@@ -476,7 +492,8 @@ class TestLogRequest:
                 None,
                 {"messages": [{"role": "user", "content": "test"}], "model": "auto"},
                 TenantModel(
-                    model_name="gpt-4o", provider="openai",
+                    model_name="gpt-4o",
+                    provider="openai",
                     litellm_model="openai/gpt-4o",
                 ),
             )
@@ -503,7 +520,8 @@ class TestLogRequest:
                 None,
                 {"messages": [{"role": "user", "content": "test"}], "model": "auto"},
                 TenantModel(
-                    model_name="gpt-4o", provider="openai",
+                    model_name="gpt-4o",
+                    provider="openai",
                     litellm_model="openai/gpt-4o",
                 ),
             )

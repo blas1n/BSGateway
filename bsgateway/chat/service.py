@@ -203,16 +203,26 @@ class ChatService:
 
         # Pass through optional OpenAI params
         for param in (
-            "temperature", "max_tokens", "top_p", "frequency_penalty",
-            "presence_penalty", "stop", "n", "tools", "tool_choice",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "frequency_penalty",
+            "presence_penalty",
+            "stop",
+            "n",
+            "tools",
+            "tool_choice",
             "response_format",
         ):
             if param in request_data:
                 litellm_kwargs[param] = request_data[param]
 
-        # Extra params from model config
+        # Extra params from model config (never allow overriding request-critical fields)
+        _protected = {"model", "messages", "stream", "api_key", "api_base"}
         if model.extra_params:
-            litellm_kwargs.update(model.extra_params)
+            for k, v in model.extra_params.items():
+                if k not in _protected:
+                    litellm_kwargs[k] = v
 
         stream = request_data.get("stream", False)
         litellm_kwargs["stream"] = stream
@@ -220,9 +230,7 @@ class ChatService:
         response = await litellm.acompletion(**litellm_kwargs)
 
         # Fire-and-forget: log routing decision + budget tracking
-        task = asyncio.create_task(
-            self._log_request(tenant_id, rule_match, request_data, model)
-        )
+        task = asyncio.create_task(self._log_request(tenant_id, rule_match, request_data, model))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 
@@ -243,21 +251,21 @@ class ChatService:
             async with self._pool.acquire() as conn:
                 await conn.execute(
                     _log_sql.query("insert_routing_log_with_tenant"),
-                    tenant_id,                   # $1
-                    rule_id,                     # $2
-                    ctx.user_text[:2000],         # $3 truncate
-                    ctx.system_prompt[:2000],     # $4
-                    ctx.estimated_tokens,         # $5
-                    ctx.conversation_turns,       # $6
-                    0,                            # $7 code_block_count
-                    0,                            # $8 code_lines
-                    ctx.has_error_trace,          # $9
-                    ctx.tool_count,               # $10
+                    tenant_id,  # $1
+                    rule_id,  # $2
+                    ctx.user_text[:2000],  # $3 truncate
+                    ctx.system_prompt[:2000],  # $4
+                    ctx.estimated_tokens,  # $5
+                    ctx.conversation_turns,  # $6
+                    0,  # $7 code_block_count
+                    0,  # $8 code_lines
+                    ctx.has_error_trace,  # $9
+                    ctx.tool_count,  # $10
                     "rule" if rule_match else "direct",  # $11 tier
-                    "rule_engine",                # $12 strategy
+                    "rule_engine",  # $12 strategy
                     rule_match.rule.priority if rule_match else None,  # $13
                     request_data.get("model", "auto"),  # $14
-                    model.litellm_model,          # $15
+                    model.litellm_model,  # $15
                 )
         except Exception:
             logger.warning("routing_log_failed", exc_info=True)
