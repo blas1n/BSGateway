@@ -7,6 +7,7 @@ from uuid import UUID
 
 import structlog
 
+from bsgateway.core.database import execute_schema
 from bsgateway.routing.collector import SqlLoader
 
 if TYPE_CHECKING:
@@ -27,12 +28,7 @@ class AuditRepository:
         """Create audit_logs table if it doesn't exist."""
         schema_path = Path(__file__).parent.parent / "routing" / "sql" / "audit_schema.sql"
         schema_sql = schema_path.read_text()
-        async with self._pool.acquire() as conn:
-            async with conn.transaction():
-                for stmt in schema_sql.split(";"):
-                    stmt = stmt.strip()
-                    if stmt:
-                        await conn.execute(stmt)
+        await execute_schema(self._pool, schema_sql)
         logger.info("audit_schema_initialized")
 
     async def record(

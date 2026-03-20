@@ -39,8 +39,16 @@ redis_data/
 # Internal docs (not for public)
 docs/internal/
 
+# Kubernetes secrets (use secret.yaml.example as template)
+k8s/secret.yaml
+
 # Devcontainer local overrides (git worktree mount)
 docker-compose.override.yml
+
+# Node modules (root-level, e.g. Playwright devDependency)
+node_modules/
+package.json
+package-lock.json
 
 # Playwright
 /test-results/

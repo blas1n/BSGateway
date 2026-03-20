@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from bsgateway.audit.repository import AuditRepository
@@ -58,6 +59,10 @@ async def lifespan(app: FastAPI):
         hash_api_key(settings.superadmin_key) if settings.superadmin_key else ""
     )
     app.state.jwt_secret = settings.jwt_secret
+    if not settings.jwt_secret:
+        logger.warning("jwt_secret_not_set", hint="JWT auth for dashboard will be disabled")
+    elif len(settings.jwt_secret) < 32:
+        logger.warning("jwt_secret_too_short", length=len(settings.jwt_secret), min_recommended=32)
 
     # Initialize Redis (optional, used for rate limiting and caching)
     app.state.redis = await _init_redis()
@@ -106,6 +111,15 @@ def create_app() -> FastAPI:
             "usage analytics, and audit logging."
         ),
         lifespan=lifespan,
+    )
+
+    # CORS — restrict to same-origin by default; override via env if needed
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[f"http://localhost:{settings.api_port}", "http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     from bsgateway.api.routers.audit import router as audit_router

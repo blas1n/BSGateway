@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -54,7 +55,7 @@ class CacheManager:
         try:
             serialized = json.dumps(value, cls=_CacheEncoder)
             if ttl:
-                await self._redis.setex(key, ttl, serialized)
+                await self._redis.setex(key, int(ttl.total_seconds()), serialized)
             else:
                 await self._redis.set(key, serialized)
             return True
@@ -95,7 +96,7 @@ class CacheManager:
 
         # Cache miss — fetch
         logger.debug("cache_miss", key=key)
-        value = await fetcher() if hasattr(fetcher, "__await__") else fetcher()
+        value = await fetcher() if inspect.iscoroutinefunction(fetcher) else fetcher()
 
         # Store in cache
         await self.set(key, value, ttl)

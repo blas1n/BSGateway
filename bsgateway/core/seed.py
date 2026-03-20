@@ -99,6 +99,6 @@ async def seed_dev_data(pool: asyncpg.Pool, encryption_key: bytes) -> None:
         "seed_completed",
         tenant_id=str(tenant_id),
         slug=DEV_TENANT_SLUG,
-        api_key=DEV_API_KEY,
+        api_key_prefix=DEV_API_KEY[:12] + "...",
         models=[m[0] for m in models],
     )

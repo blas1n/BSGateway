@@ -189,7 +189,19 @@ class ChatService:
         # Decrypt provider API key
         api_key: str | None = None
         if model.api_key_encrypted and self._encryption_key:
-            api_key = decrypt_value(model.api_key_encrypted, self._encryption_key)
+            try:
+                api_key = decrypt_value(model.api_key_encrypted, self._encryption_key)
+            except Exception as exc:
+                logger.error(
+                    "api_key_decrypt_failed",
+                    model=model.litellm_model,
+                    provider=model.provider,
+                )
+                raise ChatError(
+                    "Failed to decrypt API key for model",
+                    code="decryption_failed",
+                    status_code=500,
+                ) from exc
 
         # Build litellm call kwargs
         litellm_kwargs: dict[str, Any] = {

@@ -42,6 +42,12 @@ async def create_token(body: TokenRequest, request: Request) -> TokenResponse:
     pool = request.app.state.db_pool
     jwt_secret = request.app.state.jwt_secret
 
+    if not jwt_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="JWT authentication is not configured (JWT_SECRET not set)",
+        )
+
     key_hash = hash_api_key(body.api_key)
     repo = TenantRepository(pool)
     row = await repo.get_api_key_by_hash(key_hash)

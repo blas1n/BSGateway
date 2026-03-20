@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
+import { intentsApi } from '../api/intents';
 
 const TENANT_ID = localStorage.getItem('bsg_tenant_id') || '';
 
@@ -17,9 +18,7 @@ interface Intent {
 
 export function IntentsPage() {
   const { data: intents, loading, error, refetch } = useApi(
-    () => fetch(`/api/v1/tenants/${TENANT_ID}/intents`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('bsg_token')}` }
-    }).then(r => r.json()).catch(() => []),
+    () => intentsApi.list(TENANT_ID).catch(() => []),
     [TENANT_ID],
   );
 
@@ -36,18 +35,10 @@ export function IntentsPage() {
   const handleCreate = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/tenants/${TENANT_ID}/intents`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('bsg_token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          examples: formData.examples.filter(e => e.trim()),
-        }),
+      await intentsApi.create(TENANT_ID, {
+        ...formData,
+        examples: formData.examples.filter(e => e.trim()),
       });
-      if (!res.ok) throw new Error('Failed to create intent');
       setShowForm(false);
       setFormData({ name: '', description: '', examples: [''], target_model: '' });
       refetch();
@@ -61,11 +52,7 @@ export function IntentsPage() {
   const handleDelete = async (intent: Intent) => {
     if (deleting === intent.id) {
       try {
-        const res = await fetch(`/api/v1/tenants/${TENANT_ID}/intents/${intent.id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('bsg_token')}` },
-        });
-        if (!res.ok) throw new Error('Delete failed');
+        await intentsApi.delete(TENANT_ID, intent.id);
         setDeleting(null);
         refetch();
       } catch {

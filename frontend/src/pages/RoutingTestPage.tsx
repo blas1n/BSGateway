@@ -11,11 +11,17 @@ interface TestMessage {
   content: string;
 }
 
+interface MatchedRule {
+  id: string;
+  name: string;
+  priority: number;
+}
+
 interface TestResult {
-  selected_model: string;
-  matched_rule: string | null;
-  latency_ms: number;
-  conditions_matched: Record<string, boolean>;
+  matched_rule: MatchedRule | null;
+  target_model: string | null;
+  evaluation_trace: Record<string, unknown>[];
+  context: Record<string, unknown>;
 }
 
 export function RoutingTestPage() {
@@ -57,19 +63,10 @@ export function RoutingTestPage() {
     setTesting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/tenants/${TENANT_ID}/rules/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('bsg_token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: messages.filter(m => m.content.trim()),
-        }),
+      const data = await rulesApi.test(TENANT_ID, {
+        model: selectedModel,
+        messages: messages.filter(m => m.content.trim()),
       });
-      if (!res.ok) throw new Error('Test failed');
-      const data = await res.json();
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Test failed');
@@ -116,7 +113,7 @@ export function RoutingTestPage() {
                   value={msg.role}
                   onChange={(e) => {
                     const newMsgs = [...messages];
-                    newMsgs[i].role = e.target.value as any;
+                    newMsgs[i].role = e.target.value as 'user' | 'assistant' | 'system';
                     setMessages(newMsgs);
                   }}
                   className="w-24 border rounded-lg px-2 py-1 text-sm"
@@ -169,32 +166,43 @@ export function RoutingTestPage() {
       {result && (
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Test Result</h3>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div className="border rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Selected Model</p>
-              <p className="font-mono text-sm font-semibold">{result.selected_model}</p>
+              <p className="text-xs text-gray-500 mb-1">Target Model</p>
+              <p className="font-mono text-sm font-semibold">{result.target_model || '(none)'}</p>
             </div>
             <div className="border rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Matched Rule</p>
-              <p className="font-mono text-sm font-semibold">{result.matched_rule || '(none)'}</p>
-            </div>
-            <div className="col-span-2 border rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Latency</p>
-              <p className="text-sm font-mono">{result.latency_ms}ms</p>
+              <p className="font-mono text-sm font-semibold">
+                {result.matched_rule ? `${result.matched_rule.name} (priority: ${result.matched_rule.priority})` : '(none)'}
+              </p>
             </div>
           </div>
 
-          {Object.keys(result.conditions_matched).length > 0 && (
+          {result.context && Object.keys(result.context).length > 0 && (
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-gray-700 mb-2">Matched Conditions</p>
+              <p className="text-sm font-semibold text-gray-700 mb-2">Request Context</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(result.context).map(([key, value]) => (
+                  value !== null && value !== undefined && (
+                    <div key={key} className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 text-xs">{key}:</span>
+                      <span className="font-mono text-xs">{String(value)}</span>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+
+          {result.evaluation_trace && result.evaluation_trace.length > 0 && (
+            <div className="border-t pt-4">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Evaluation Trace</p>
               <div className="space-y-1">
-                {Object.entries(result.conditions_matched).map(([condition, matched]) => (
-                  <div key={condition} className="flex items-center gap-2 text-sm">
-                    <span className={matched ? 'text-green-600' : 'text-gray-400'}>
-                      {matched ? '✓' : '✗'}
-                    </span>
-                    <span className="font-mono text-xs">{condition}</span>
+                {result.evaluation_trace.map((entry, i) => (
+                  <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1">
+                    {JSON.stringify(entry)}
                   </div>
                 ))}
               </div>
