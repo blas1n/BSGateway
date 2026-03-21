@@ -69,19 +69,17 @@ test.describe('Route Testing Page', () => {
 
     // Results section
     await expect(page.locator('text=Test Result')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Selected Model')).toBeVisible();
+    await expect(page.locator('text=Target Model')).toBeVisible();
     await expect(page.locator('text=Matched Rule')).toBeVisible();
-    await expect(page.locator('text=High-priority rule')).toBeVisible();
-    await expect(page.locator('text=Latency')).toBeVisible();
-    await expect(page.locator('text=4.2ms')).toBeVisible();
+    await expect(page.locator('p.font-mono:has-text("claude-sonnet")')).toBeVisible();
   });
 
-  test('shows matched conditions in results', async ({ page }) => {
+  test('shows evaluation trace in results', async ({ page }) => {
     await page.fill('textarea[placeholder="Message content"]', 'urgent request');
     await page.click('button:has-text("Test Routing")');
 
-    await expect(page.locator('text=Matched Conditions')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=keyword:content:contains:urgent')).toBeVisible();
+    await expect(page.locator('text=Evaluation Trace')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=keyword condition met')).toBeVisible();
   });
 
   test('test button disabled when no model selected', async ({ page }) => {

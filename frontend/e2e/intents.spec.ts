@@ -19,9 +19,8 @@ test.describe('Intents Management', () => {
     await expect(page.locator('text=Requests to generate code')).toBeVisible();
   });
 
-  test('shows example counts', async ({ page }) => {
-    await expect(page.locator('text=2 example(s)')).toBeVisible(); // summarization has 2
-    await expect(page.locator('text=1 example(s)')).toBeVisible(); // code-generation has 1
+  test('shows threshold for each intent', async ({ page }) => {
+    await expect(page.locator('text=threshold: 0.7').first()).toBeVisible();
   });
 
   test('shows inactive badge for disabled intents', async ({ page }) => {

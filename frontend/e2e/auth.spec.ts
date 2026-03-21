@@ -38,7 +38,7 @@ test.describe('Authentication Flow', () => {
     await page.click('button[type="submit"]');
 
     // Error message should appear
-    await expect(page.locator('text=Invalid or expired')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=Invalid API key')).toBeVisible({ timeout: 3000 });
 
     // Should still be on login page
     await expect(page.locator('button[type="submit"]')).toContainText('Sign in');
