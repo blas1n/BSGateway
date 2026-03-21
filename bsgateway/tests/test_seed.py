@@ -124,14 +124,14 @@ class TestSeedDevData:
         conn.execute = AsyncMock()
         pool = self._make_pool(conn)
 
-        with (
-            patch("bsgateway.core.seed.logger") as mock_logger,
-            patch("builtins.print") as mock_print,
-        ):
+        with patch("bsgateway.core.seed.logger") as mock_logger:
             await seed_dev_data(pool, ENCRYPTION_KEY)
 
-            call_kwargs = mock_logger.info.call_args_list[-1].kwargs
-            assert "api_key" not in call_kwargs
-            assert call_kwargs["api_key_prefix"] == _FAKE_PREFIX
-            mock_print.assert_called_once()
-            assert _FAKE_KEY in mock_print.call_args[0][0]
+            # API key is now logged via structlog warning (not print)
+            warn_kwargs = mock_logger.warning.call_args.kwargs
+            assert warn_kwargs["api_key"] == _FAKE_KEY
+            assert "hint" in warn_kwargs
+
+            # Structured info log still has prefix, not full key
+            info_kwargs = mock_logger.info.call_args_list[-1].kwargs
+            assert info_kwargs["api_key_prefix"] == _FAKE_PREFIX

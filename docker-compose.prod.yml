@@ -85,22 +85,18 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Frontend
-  frontend:
+  # Frontend — build stage only; static assets served by nginx
+  frontend-build:
     image: node:20-alpine
-    container_name: bsgateway-frontend
+    container_name: bsgateway-frontend-build
     working_dir: /app
-    command: ["sh", "-c", "npm run build && npm run preview"]
+    command: ["sh", "-c", "npm ci && npm run build"]
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    ports:
-      - "5173:5173"
+      - frontend_dist:/app/dist
     environment:
-      VITE_API_URL: http://localhost:8000
-    networks:
-      - bsgateway-network
-    restart: unless-stopped
+      VITE_API_URL: ""
 
   # Nginx Reverse Proxy
   nginx:
@@ -112,9 +108,10 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
+      - frontend_dist:/usr/share/nginx/html/dashboard:ro
     depends_on:
       - api
-      - frontend
+      - frontend-build
     networks:
       - bsgateway-network
     restart: unless-stopped
@@ -123,6 +120,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  frontend_dist:
     driver: local
 
 networks:
