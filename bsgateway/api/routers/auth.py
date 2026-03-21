@@ -24,11 +24,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # The check-then-append pattern is safe in async single-threaded context (no preemption
 # between the len() check and append within the same coroutine).
 _AUTH_RATE_LIMIT = 10
+_AUTH_MAX_IPS = 10_000
 _auth_attempts: dict[str, list[float]] = defaultdict(list)
+_auth_call_count = 0
 
 
 def _check_auth_rate_limit(client_ip: str) -> None:
     """Raise 429 if the IP exceeds auth rate limit."""
+    global _auth_call_count
+    _auth_call_count += 1
     now = time.monotonic()
     window = [t for t in _auth_attempts[client_ip] if now - t < 60]
     _auth_attempts[client_ip] = window
@@ -38,9 +42,17 @@ def _check_auth_rate_limit(client_ip: str) -> None:
             detail="Too many authentication attempts. Try again later.",
         )
     window.append(now)
-    # Periodically prune stale IPs (every 100 checks)
-    if sum(1 for v in _auth_attempts.values() if not v) > 100:
-        for ip in [k for k, v in _auth_attempts.items() if not v]:
+    # Full sweep every 200 calls to prune expired entries
+    if _auth_call_count % 200 == 0:
+        stale = [k for k, v in _auth_attempts.items() if not v or (now - v[-1]) > 60]
+        for ip in stale:
+            del _auth_attempts[ip]
+    # Hard cap to prevent unbounded memory growth
+    if len(_auth_attempts) > _AUTH_MAX_IPS:
+        oldest = sorted(
+            _auth_attempts, key=lambda k: _auth_attempts[k][-1] if _auth_attempts[k] else 0
+        )
+        for ip in oldest[: len(_auth_attempts) - _AUTH_MAX_IPS]:
             del _auth_attempts[ip]
 
 

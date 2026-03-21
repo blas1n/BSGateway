@@ -411,12 +411,8 @@ class TestLoadTenantConfig:
 
         svc = ChatService(pool, ENCRYPTION_KEY)
 
-        with (
-            patch("bsgateway.chat.service._rules_sql") as mock_rules_sql,
-            patch("bsgateway.chat.service._tenant_sql") as mock_tenant_sql,
-        ):
-            mock_rules_sql.query.side_effect = lambda q: q
-            mock_tenant_sql.query.side_effect = lambda q: q
+        with patch("bsgateway.chat.service._sql") as mock_sql:
+            mock_sql.query.side_effect = lambda q: q
 
             config = await svc.load_tenant_config(TENANT_ID)
 
@@ -456,12 +452,8 @@ class TestLoadTenantConfig:
 
         svc = ChatService(pool, ENCRYPTION_KEY)
 
-        with (
-            patch("bsgateway.chat.service._rules_sql") as mock_rules_sql,
-            patch("bsgateway.chat.service._tenant_sql") as mock_tenant_sql,
-        ):
-            mock_rules_sql.query.side_effect = lambda q: q
-            mock_tenant_sql.query.side_effect = lambda q: q
+        with patch("bsgateway.chat.service._sql") as mock_sql:
+            mock_sql.query.side_effect = lambda q: q
 
             config = await svc.load_tenant_config(TENANT_ID)
 
@@ -483,7 +475,7 @@ class TestLogRequest:
 
         svc = ChatService(pool, ENCRYPTION_KEY)
 
-        with patch("bsgateway.chat.service._log_sql") as mock_log_sql:
+        with patch("bsgateway.chat.service._sql") as mock_log_sql:
             mock_log_sql.query.side_effect = lambda q: q
 
             # Should not raise
@@ -505,7 +497,7 @@ class TestLogRequest:
         svc = ChatService(pool, ENCRYPTION_KEY, redis=mock_redis)
 
         with (
-            patch("bsgateway.chat.service._log_sql") as mock_log_sql,
+            patch("bsgateway.chat.service._sql") as mock_log_sql,
             patch(
                 "bsgateway.rules.budget.BudgetTracker.increment_request_count",
                 new_callable=AsyncMock,

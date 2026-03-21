@@ -6,22 +6,14 @@ import {
 import { api, SESSION_KEYS } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
+import type { UsageResponse } from '../types/api';
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-
-interface UsageStats {
-  total_requests: number;
-  total_tokens: number;
-  success_rate: number;
-  by_model: Record<string, number>;
-  by_rule: Record<string, number>;
-  daily_breakdown: Record<string, number>;
-}
 
 export function UsagePage() {
   const tenantId = sessionStorage.getItem(SESSION_KEYS.tenantId) || '';
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
-  const [data, setData] = useState<UsageStats | null>(null);
+  const [data, setData] = useState<UsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +25,7 @@ export function UsagePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<UsageStats>(
+      const res = await api.get<UsageResponse>(
         `/tenants/${tenantId}/usage?period=${period}`
       );
       setData(res);
@@ -47,16 +39,16 @@ export function UsagePage() {
   if (loading) return <LoadingSpinner />;
 
   const dailyData = data?.daily_breakdown
-    ? Object.entries(data.daily_breakdown).map(([date, requests]) => ({
-      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      requests,
+    ? data.daily_breakdown.map((d) => ({
+      date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      requests: d.requests,
     }))
     : [];
 
   const modelData = data?.by_model
-    ? Object.entries(data.by_model).map(([model, requests]) => ({
+    ? Object.entries(data.by_model).map(([model, usage]) => ({
       name: model,
-      value: requests,
+      value: usage.requests,
     }))
     : [];
 

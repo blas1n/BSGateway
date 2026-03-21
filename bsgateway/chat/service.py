@@ -32,9 +32,7 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
-_tenant_sql = SqlLoader()
-_rules_sql = SqlLoader()
-_log_sql = SqlLoader()
+_sql = SqlLoader()
 
 
 class ChatService:
@@ -60,22 +58,22 @@ class ChatService:
         async with self._pool.acquire() as conn:
             # 1. Active rules
             rule_rows = await conn.fetch(
-                _rules_sql.query("list_rules"),
+                _sql.query("list_rules"),
                 tenant_id,
             )
             # 2. Conditions for all of tenant's rules (batch)
             cond_rows = await conn.fetch(
-                _rules_sql.query("list_conditions_for_tenant"),
+                _sql.query("list_conditions_for_tenant"),
                 tenant_id,
             )
             # 3. Active models with encrypted keys
             model_rows = await conn.fetch(
-                _tenant_sql.query("list_active_models_with_keys"),
+                _sql.query("list_active_models_with_keys"),
                 tenant_id,
             )
             # 4. Tenant settings
             tenant_row = await conn.fetchrow(
-                _tenant_sql.query("get_tenant_by_id"),
+                _sql.query("get_tenant_by_id"),
                 tenant_id,
             )
 
@@ -265,7 +263,7 @@ class ChatService:
 
             async with self._pool.acquire() as conn:
                 await conn.execute(
-                    _log_sql.query("insert_routing_log_with_tenant"),
+                    _sql.query("insert_routing_log_with_tenant"),
                     tenant_id,  # $1
                     rule_id,  # $2
                     ctx.user_text[:2000],  # $3 truncate

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
@@ -79,25 +80,21 @@ async def get_usage(
     pool = get_pool(request)
     start, end = _parse_period(period, from_date, to_date)
 
-    async with pool.acquire() as conn:
-        total_row = await conn.fetchrow(
-            _sql.query("usage_total"),
-            tenant_id,
-            start,
-            end,
-        )
-        model_rows = await conn.fetch(
-            _sql.query("usage_by_model"),
-            tenant_id,
-            start,
-            end,
-        )
-        rule_rows = await conn.fetch(
-            _sql.query("usage_by_rule"),
-            tenant_id,
-            start,
-            end,
-        )
+    async def _fetch_total():
+        async with pool.acquire() as conn:
+            return await conn.fetchrow(_sql.query("usage_total"), tenant_id, start, end)
+
+    async def _fetch_models():
+        async with pool.acquire() as conn:
+            return await conn.fetch(_sql.query("usage_by_model"), tenant_id, start, end)
+
+    async def _fetch_rules():
+        async with pool.acquire() as conn:
+            return await conn.fetch(_sql.query("usage_by_rule"), tenant_id, start, end)
+
+    total_row, model_rows, rule_rows = await asyncio.gather(
+        _fetch_total(), _fetch_models(), _fetch_rules()
+    )
 
     total_requests = total_row["total_requests"] if total_row else 0
     total_tokens = total_row["total_tokens"] if total_row else 0

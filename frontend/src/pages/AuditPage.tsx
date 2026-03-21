@@ -2,16 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, SESSION_KEYS } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
-
-interface AuditLog {
-  id: string;
-  created_at: string;
-  actor: string;
-  action: string;
-  resource_type: string;
-  resource_id: string;
-  details: Record<string, any> | null;
-}
+import type { AuditLog } from '../types/api';
 
 interface AuditLogListResponse {
   items: AuditLog[];

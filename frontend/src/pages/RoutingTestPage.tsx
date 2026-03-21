@@ -25,7 +25,7 @@ interface TestResult {
 
 export function RoutingTestPage() {
   const tenantId = sessionStorage.getItem(SESSION_KEYS.tenantId) || '';
-  const [models, setModels] = useState<any[]>([]);
+  const [models, setModels] = useState<{ model_name: string }[]>([]);
   const [loadingModels, setLoadingModels] = useState(true);
   const [selectedModel, setSelectedModel] = useState('');
   const [messages, setMessages] = useState<TestMessage[]>([{ role: 'user', content: '' }]);

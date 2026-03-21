@@ -61,8 +61,9 @@ async def _build_rule_response(
     row: asyncpg.Record,
     tenant_id: UUID,
 ) -> RuleResponse:
-    """Build a single rule response using batch fetch (avoids N+1)."""
-    return (await _build_rule_responses_batch(repo, [row], tenant_id))[0]
+    """Build a single rule response (fetches conditions for this rule only)."""
+    conditions = await repo.list_conditions(row["id"])
+    return _row_to_rule_response(row, conditions)
 
 
 def _row_to_rule_response(

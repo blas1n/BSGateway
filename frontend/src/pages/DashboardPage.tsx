@@ -5,6 +5,7 @@ import { tenantsApi } from '../api/tenants';
 import { api, SESSION_KEYS } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
+import type { UsageResponse } from '../types/api';
 
 interface Stat {
   label: string;
@@ -35,26 +36,26 @@ export function DashboardPage() {
       const [rules, models, usage] = await Promise.all([
         rulesApi.list(tenantId).catch(() => []),
         tenantsApi.listModels(tenantId).catch(() => []),
-        api.get<any>(`/tenants/${tenantId}/usage?period=week`).catch(() => ({})),
+        api.get<UsageResponse>(`/tenants/${tenantId}/usage?period=week`).catch(() => null),
       ]);
 
       const ruleCount = Array.isArray(rules) ? rules.length : 0;
       const modelCount = Array.isArray(models) ? models.length : 0;
       const totalRequests = usage?.total_requests || 0;
-      const successRate = usage?.success_rate ? `${Math.round(usage.success_rate * 100)}%` : '—';
+      const totalTokens = usage?.total_tokens || 0;
 
       setStats([
         { label: 'Active Rules', value: ruleCount, subtext: 'routing policies' },
         { label: 'Registered Models', value: modelCount, subtext: 'LLM endpoints' },
         { label: 'Daily Requests', value: totalRequests, subtext: 'this week' },
-        { label: 'Success Rate', value: successRate },
+        { label: 'Total Tokens', value: totalTokens.toLocaleString() },
       ]);
 
       // Format usage data for chart
       if (usage?.daily_breakdown) {
-        const chartData = Object.entries(usage.daily_breakdown).map(([date, count]: [string, any]) => ({
-          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          requests: typeof count === 'number' ? count : 0,
+        const chartData = usage.daily_breakdown.map((d) => ({
+          date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          requests: d.requests,
         }));
         setUsageData(chartData);
       }

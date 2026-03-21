@@ -76,17 +76,17 @@ async def get_auth_context(request: Request) -> AuthContext:
         except pyjwt.InvalidTokenError:
             logger.debug("jwt_decode_failed", exc_info=True)
 
+    # Compute hash once (used for both superadmin check and DB lookup)
+    key_hash = hash_api_key(token)
+
     # Check superadmin key (compare hashes, never plaintext)
     superadmin_hash = getattr(request.app.state, "superadmin_key_hash", "")
-    if superadmin_hash and hmac.compare_digest(hash_api_key(token), superadmin_hash):
+    if superadmin_hash and hmac.compare_digest(key_hash, superadmin_hash):
         return AuthContext(
             tenant_id=SUPERADMIN_UUID,
             scopes=["admin"],
             key_hash="",
         )
-
-    # Resolve tenant via API key
-    key_hash = hash_api_key(token)
 
     from bsgateway.tenant.repository import TenantRepository
 
@@ -112,9 +112,13 @@ async def get_auth_context(request: Request) -> AuthContext:
             detail="Access denied",
         )
 
-    # Touch last_used_at (fire-and-forget)
+    # Touch last_used_at (true fire-and-forget — don't block the request)
+    import asyncio
+
     try:
-        await repo.touch_api_key(key_hash)
+        asyncio.get_running_loop().call_soon(
+            lambda: asyncio.create_task(repo.touch_api_key(key_hash))
+        )
     except Exception:
         logger.warning("touch_api_key_failed", exc_info=True)
 
