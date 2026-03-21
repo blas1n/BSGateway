@@ -61,12 +61,15 @@ class ChatService:
         pool: asyncpg.Pool,
         encryption_key: bytes,
         redis: Redis | None = None,
+        background_tasks: set[asyncio.Task] | None = None,
     ) -> None:
         self._pool = pool
         self._encryption_key = encryption_key
         self._redis = redis
         self._engine = RuleEngine()
-        self._background_tasks: set[asyncio.Task] = set()
+        self._background_tasks: set[asyncio.Task] = (
+            background_tasks if background_tasks is not None else set()
+        )
 
     async def load_tenant_config(self, tenant_id: UUID) -> TenantConfig:
         """Batch-load rules + conditions + models for a tenant (3 queries)."""
@@ -290,8 +293,10 @@ class ChatService:
                     request_data.get("model", "auto"),  # $14
                     model.litellm_model,  # $15
                 )
-        except Exception:
+        except (ConnectionError, TimeoutError, OSError):
             logger.warning("routing_log_failed", exc_info=True)
+        except Exception:
+            logger.error("routing_log_unexpected_error", exc_info=True)
 
         # Budget tracking
         if self._redis:
@@ -300,8 +305,10 @@ class ChatService:
 
                 tracker = BudgetTracker(self._redis)
                 await tracker.increment_request_count(str(tenant_id))
-            except Exception:
+            except (ConnectionError, TimeoutError, OSError):
                 logger.warning("budget_tracking_failed", exc_info=True)
+            except Exception:
+                logger.error("budget_tracking_unexpected_error", exc_info=True)
 
 
 class ChatError(Exception):

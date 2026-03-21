@@ -9,6 +9,11 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from bsgateway.core.security import hash_api_key
+
+TEST_API_KEY = "bsg_test-key-for-auth"
+TEST_KEY_HASH = hash_api_key(TEST_API_KEY)
+
 
 @pytest.fixture()
 def _app():
@@ -41,7 +46,7 @@ def _make_key_row(
     row = {
         "id": uuid4(),
         "tenant_id": tid,
-        "key_hash": "somehash",
+        "key_hash": TEST_KEY_HASH,
         "key_prefix": "bsg_test1234",
         "name": "default",
         "scopes": scopes or ["chat", "admin"],
@@ -66,7 +71,7 @@ class TestAuthToken:
             repo.get_api_key_by_hash = AsyncMock(return_value=row)
             repo.touch_api_key = AsyncMock()
 
-            res = client.post("/api/v1/auth/token", json={"api_key": "bsg_test"})
+            res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
         assert res.status_code == 200
         body = res.json()
@@ -91,7 +96,7 @@ class TestAuthToken:
             repo = mock_repo_cls.return_value
             repo.get_api_key_by_hash = AsyncMock(return_value=row)
 
-            res = client.post("/api/v1/auth/token", json={"api_key": "bsg_expired"})
+            res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
         assert res.status_code == 401
 
@@ -101,7 +106,7 @@ class TestAuthToken:
             repo = mock_repo_cls.return_value
             repo.get_api_key_by_hash = AsyncMock(return_value=row)
 
-            res = client.post("/api/v1/auth/token", json={"api_key": "bsg_dead"})
+            res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
         assert res.status_code == 401
 
@@ -111,7 +116,7 @@ class TestAuthToken:
             repo = mock_repo_cls.return_value
             repo.get_api_key_by_hash = AsyncMock(return_value=row)
 
-            res = client.post("/api/v1/auth/token", json={"api_key": "bsg_notenent"})
+            res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
         assert res.status_code == 403
 
@@ -130,7 +135,7 @@ class TestAuthToken:
             repo.get_api_key_by_hash = AsyncMock(return_value=row)
             repo.touch_api_key = AsyncMock()
 
-            res = client.post("/api/v1/auth/token", json={"api_key": "bsg_test"})
+            res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
         token = res.json()["token"]
         from bsgateway.core.security import decode_jwt

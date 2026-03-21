@@ -99,8 +99,8 @@ async def seed_dev_data(pool: asyncpg.Pool, encryption_key: bytes) -> None:
         "seed_completed",
         tenant_id=str(tenant_id),
         slug=DEV_TENANT_SLUG,
-        api_key=dev_api_key,
         api_key_prefix=key_prefix,
         models=[m[0] for m in models],
-        hint="Save this API key — it will not be shown again",
     )
+    # Print key to stdout (not structured logs) so operator can capture it once
+    print(f"[seed] Dev API key (save now): {dev_api_key}")

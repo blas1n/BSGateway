@@ -140,7 +140,8 @@ async def chat_completions(
     if rate_limit_resp is not None:
         return rate_limit_resp
 
-    svc = ChatService(pool, encryption_key, redis)
+    bg_tasks: set = getattr(request.app.state, "background_tasks", set())
+    svc = ChatService(pool, encryption_key, redis, background_tasks=bg_tasks)
 
     try:
         response = await svc.complete(auth.tenant_id, body)

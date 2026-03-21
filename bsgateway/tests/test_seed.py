@@ -124,9 +124,14 @@ class TestSeedDevData:
         conn.execute = AsyncMock()
         pool = self._make_pool(conn)
 
-        with patch("bsgateway.core.seed.logger") as mock_logger:
+        with (
+            patch("bsgateway.core.seed.logger") as mock_logger,
+            patch("builtins.print") as mock_print,
+        ):
             await seed_dev_data(pool, ENCRYPTION_KEY)
 
             call_kwargs = mock_logger.info.call_args_list[-1].kwargs
-            assert call_kwargs["api_key"] == _FAKE_KEY
+            assert "api_key" not in call_kwargs
             assert call_kwargs["api_key_prefix"] == _FAKE_PREFIX
+            mock_print.assert_called_once()
+            assert _FAKE_KEY in mock_print.call_args[0][0]

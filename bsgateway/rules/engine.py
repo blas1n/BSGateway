@@ -150,7 +150,7 @@ class RuleEngine:
             if texts_to_classify:
                 tasks = [intent_classifier.classify(text) for text in texts_to_classify]
                 results = await asyncio.gather(*tasks)
-                for (_, text), result in zip(text_indices, results, strict=False):
+                for (_, text), result in zip(text_indices, results, strict=True):
                     intent_cache[text] = result
 
         # Evaluate all requests in parallel

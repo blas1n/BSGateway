@@ -53,8 +53,15 @@ class RateLimiter:
                 reset_at=reset_at,
             )
         except Exception:
-            # Fail-open: allow request if Redis is unavailable
-            logger.warning("rate_limit_check_failed", tenant_id=tenant_id, exc_info=True)
+            # Design decision: fail-open to avoid blocking all requests during
+            # Redis outages. Operators should alert on this log and restore Redis
+            # promptly to re-enable rate limiting.
+            logger.error(
+                "rate_limit_redis_unavailable",
+                tenant_id=tenant_id,
+                detail="rate limiting bypassed — Redis unreachable",
+                exc_info=True,
+            )
             return RateLimitResult(
                 allowed=True,
                 limit=rpm,

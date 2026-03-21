@@ -7,7 +7,7 @@ services:
     container_name: bsgateway-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-bsgateway}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-bsgateway}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,7 +29,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: bsgateway-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
     healthcheck:
@@ -60,13 +60,13 @@ services:
     environment:
       ENVIRONMENT: production
       LOG_LEVEL: INFO
-      COLLECTOR_DATABASE_URL: postgresql://${POSTGRES_USER:-bsgateway}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-bsgateway}
+      COLLECTOR_DATABASE_URL: postgresql://${POSTGRES_USER:-bsgateway}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-bsgateway}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      SUPERADMIN_KEY: ${SUPERADMIN_KEY:-change-me}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      SUPERADMIN_KEY: ${SUPERADMIN_KEY:?SUPERADMIN_KEY is required}
       SEED_DEV_DATA: "false"
     ports:
       - "8000:8000"

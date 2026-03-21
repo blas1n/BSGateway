@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -67,6 +68,9 @@ async def lifespan(app: FastAPI):
             "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
         )
 
+    # Global background task set for graceful shutdown tracking
+    app.state.background_tasks: set = set()
+
     # Initialize Redis (optional, used for rate limiting and caching)
     app.state.redis = await _init_redis()
 
@@ -94,6 +98,15 @@ async def lifespan(app: FastAPI):
 
     logger.info("api_server_started", port=settings.api_port)
     yield
+
+    # Drain background tasks before closing connections
+    if app.state.background_tasks:
+        logger.info("draining_background_tasks", count=len(app.state.background_tasks))
+        _done, _pending = await asyncio.wait(app.state.background_tasks, timeout=25.0)
+        if _pending:
+            logger.warning("background_tasks_timed_out", count=len(_pending))
+            for t in _pending:
+                t.cancel()
 
     # Cleanup Redis
     if app.state.redis:
@@ -148,6 +161,10 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router, prefix="/api/v1")
     app.include_router(usage_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
+
+    @app.get("/health", tags=["health"])
+    async def health() -> dict:
+        return {"status": "ok"}
 
     # Serve frontend dashboard (only if build directory exists)
     if settings.frontend_dist_dir:
