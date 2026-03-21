@@ -56,8 +56,9 @@ class CacheManager:
             value = await self._redis.get(key)
             if value is None:
                 return None
+            result = json.loads(value)
             self._record_success()
-            return json.loads(value)
+            return result
         except json.JSONDecodeError:
             logger.warning("cache_deserialization_failed", key=key, exc_info=True)
             await self.delete(key)
