@@ -180,7 +180,7 @@ class ChatService:
         request_data: dict,
     ) -> Any:
         """Full pipeline: load config → resolve model → call litellm."""
-        import litellm
+        import litellm  # runtime import: optional heavy dependency
 
         tenant_config = await self.load_tenant_config(tenant_id)
 
@@ -249,9 +249,15 @@ class ChatService:
             )
         )
         self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+        task.add_done_callback(self._on_background_done)
 
         return response
+
+    def _on_background_done(self, task: asyncio.Task) -> None:
+        """Clean up background task and log any unhandled errors."""
+        self._background_tasks.discard(task)
+        if not task.cancelled() and task.exception():
+            logger.warning("background_task_failed", exc_info=task.exception())
 
     async def _log_request(
         self,

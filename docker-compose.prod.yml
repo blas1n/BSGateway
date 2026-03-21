@@ -90,7 +90,7 @@ services:
     image: node:20-alpine
     container_name: bsgateway-frontend
     working_dir: /app
-    command: npm run build && npm run preview
+    command: ["sh", "-c", "npm run build && npm run preview"]
     volumes:
       - ./frontend:/app
       - /app/node_modules

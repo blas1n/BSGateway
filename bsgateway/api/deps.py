@@ -65,7 +65,7 @@ async def get_auth_context(request: Request) -> AuthContext:
     if jwt_secret:
         try:
             payload = decode_jwt(token, jwt_secret)
-            logger.info("auth_jwt_success", tenant_id=payload.tenant_id)
+            logger.debug("auth_jwt_success", tenant_id=payload.tenant_id)
             return AuthContext(
                 tenant_id=UUID(payload.tenant_id),
                 scopes=payload.scopes,

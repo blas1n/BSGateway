@@ -7,9 +7,16 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from bsgateway.api.deps import AuthContext, get_auth_context, get_encryption_key, get_pool
+from bsgateway.api.deps import (
+    AuthContext,
+    get_auth_context,
+    get_cache,
+    get_encryption_key,
+    get_pool,
+)
 from bsgateway.chat.ratelimit import RateLimiter
 from bsgateway.chat.service import ChatError, ChatService
+from bsgateway.tenant.repository import TenantRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -37,6 +44,59 @@ def _error_response(
                 "param": None,
                 "code": code,
             }
+        },
+    )
+
+
+async def _check_rate_limit(
+    request: Request,
+    auth: AuthContext,
+    pool: Any,
+    redis: Any,
+) -> JSONResponse | None:
+    """Check per-tenant rate limit. Returns 429 response or None if allowed."""
+    if not redis:
+        return None
+
+    cache = get_cache(request)
+    tenant_repo = TenantRepository(pool, cache=cache)
+    tenant_row = await tenant_repo.get_tenant(auth.tenant_id)
+    if not tenant_row:
+        return None
+
+    raw_settings = tenant_row["settings"]
+    tenant_settings = (
+        json.loads(raw_settings) if isinstance(raw_settings, str) else (raw_settings or {})
+    )
+    rate_limit = tenant_settings.get("rate_limit", {})
+    try:
+        rpm = int(rate_limit.get("requests_per_minute", 0))
+    except (TypeError, ValueError):
+        rpm = 0
+    if not (0 <= rpm <= 100_000):
+        rpm = 0
+    if rpm <= 0:
+        return None
+
+    limiter = RateLimiter(redis)
+    result = await limiter.check(str(auth.tenant_id), rpm)
+    if result.allowed:
+        return None
+
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": {
+                "message": "Rate limit exceeded",
+                "type": "rate_limit_error",
+                "param": None,
+                "code": "rate_limit_exceeded",
+            }
+        },
+        headers={
+            "X-RateLimit-Limit": str(result.limit),
+            "X-RateLimit-Remaining": str(result.remaining),
+            "X-RateLimit-Reset": str(result.reset_at),
         },
     )
 
@@ -75,49 +135,10 @@ async def chat_completions(
     encryption_key = get_encryption_key(request)
     redis = _get_redis(request)
 
-    # Rate limiting (if Redis available and tenant has rate_limit config)
-    if redis:
-        from bsgateway.tenant.repository import TenantRepository
-
-        cache = getattr(request.app.state, "cache", None)
-        tenant_repo = TenantRepository(pool, cache=cache)
-        tenant_row = await tenant_repo.get_tenant(auth.tenant_id)
-        if tenant_row:
-            import json as json_mod
-
-            raw_settings = tenant_row["settings"]
-            settings = (
-                json_mod.loads(raw_settings)
-                if isinstance(raw_settings, str)
-                else (raw_settings or {})
-            )
-            rate_limit = settings.get("rate_limit", {})
-            try:
-                rpm = int(rate_limit.get("requests_per_minute", 0))
-            except (TypeError, ValueError):
-                rpm = 0
-            if not (0 <= rpm <= 100_000):
-                rpm = 0
-            if rpm > 0:
-                limiter = RateLimiter(redis)
-                result = await limiter.check(str(auth.tenant_id), rpm)
-                if not result.allowed:
-                    return JSONResponse(
-                        status_code=429,
-                        content={
-                            "error": {
-                                "message": "Rate limit exceeded",
-                                "type": "rate_limit_error",
-                                "param": None,
-                                "code": "rate_limit_exceeded",
-                            }
-                        },
-                        headers={
-                            "X-RateLimit-Limit": str(result.limit),
-                            "X-RateLimit-Remaining": str(result.remaining),
-                            "X-RateLimit-Reset": str(result.reset_at),
-                        },
-                    )
+    # Rate limiting
+    rate_limit_resp = await _check_rate_limit(request, auth, pool, redis)
+    if rate_limit_resp is not None:
+        return rate_limit_resp
 
     svc = ChatService(pool, encryption_key, redis)
 
