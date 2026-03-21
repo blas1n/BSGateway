@@ -29,8 +29,6 @@ async def run_migrations() -> None:
         raise RuntimeError("collector_database_url is required")
 
     pool = await asyncpg.create_pool(settings.collector_database_url, min_size=1, max_size=2)
-    assert pool is not None
-
     try:
         # routing_logs must exist before tenant_schema (which ALTERs it)
         routing_sql = SqlLoader()

@@ -8,13 +8,11 @@ from __future__ import annotations
 import asyncpg
 import structlog
 
-from bsgateway.core.security import encrypt_value, hash_api_key
+from bsgateway.core.security import encrypt_value, generate_api_key, hash_api_key
 from bsgateway.tenant.repository import TenantRepository
 
 logger = structlog.get_logger(__name__)
 
-# Fixed dev API key for convenience (deterministic, NOT for production)
-DEV_API_KEY = "bsg_dev-test-key-do-not-use-in-production-000"
 DEV_TENANT_SLUG = "dev-team"
 DEV_TENANT_NAME = "Dev Team"
 
@@ -29,6 +27,9 @@ async def seed_dev_data(pool: asyncpg.Pool, encryption_key: bytes) -> None:
         logger.info("seed_skipped", reason="tenant already exists", slug=DEV_TENANT_SLUG)
         return
 
+    # Generate a random API key (logged once to console)
+    dev_api_key, key_prefix = generate_api_key()
+
     async with pool.acquire() as conn:
         async with conn.transaction():
             # 1. Create tenant
@@ -40,13 +41,12 @@ async def seed_dev_data(pool: asyncpg.Pool, encryption_key: bytes) -> None:
                 """,
                 DEV_TENANT_NAME,
                 DEV_TENANT_SLUG,
-                '{"rate_limit": {"rpm": 60}}',
+                '{"rate_limit": {"requests_per_minute": 60}}',
             )
             tenant_id = tenant["id"]
 
-            # 2. Create API key (fixed for dev convenience)
-            key_hash = hash_api_key(DEV_API_KEY)
-            key_prefix = DEV_API_KEY[: len("bsg_") + 8]
+            # 2. Create API key (random, shown in logs once)
+            key_hash = hash_api_key(dev_api_key)
             await conn.execute(
                 """
                 INSERT INTO tenant_api_keys (tenant_id, key_hash, key_prefix, name, scopes)
@@ -99,6 +99,8 @@ async def seed_dev_data(pool: asyncpg.Pool, encryption_key: bytes) -> None:
         "seed_completed",
         tenant_id=str(tenant_id),
         slug=DEV_TENANT_SLUG,
-        api_key_prefix=DEV_API_KEY[:12] + "...",
+        api_key=dev_api_key,
+        api_key_prefix=key_prefix,
         models=[m[0] for m in models],
+        hint="Save this API key — it will not be shown again",
     )

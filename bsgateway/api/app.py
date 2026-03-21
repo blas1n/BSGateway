@@ -62,7 +62,10 @@ async def lifespan(app: FastAPI):
     if not settings.jwt_secret:
         logger.warning("jwt_secret_not_set", hint="JWT auth for dashboard will be disabled")
     elif len(settings.jwt_secret) < 32:
-        logger.warning("jwt_secret_too_short", length=len(settings.jwt_secret), min_recommended=32)
+        raise RuntimeError(
+            f"JWT_SECRET must be at least 32 characters (got {len(settings.jwt_secret)}). "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+        )
 
     # Initialize Redis (optional, used for rate limiting and caching)
     app.state.redis = await _init_redis()
@@ -113,10 +116,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — restrict to same-origin by default; override via env if needed
+    # CORS — configurable via CORS_ALLOWED_ORIGINS env var
+    if settings.cors_allowed_origins:
+        cors_origins = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
+    else:
+        cors_origins = [f"http://localhost:{settings.api_port}"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[f"http://localhost:{settings.api_port}", "http://localhost:5173"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
@@ -143,7 +150,10 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix="/api/v1")
 
     # Serve frontend dashboard (only if build directory exists)
-    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+    if settings.frontend_dist_dir:
+        frontend_dist = Path(settings.frontend_dist_dir)
+    else:
+        frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.is_dir():
         app.mount(
             "/dashboard",

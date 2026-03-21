@@ -162,36 +162,30 @@ class TestRulesCRUD:
             assert resp.status_code == 400
             assert "not registered" in resp.json()["detail"]
 
-    def test_create_default_rule_skips_model_validation(
+    def test_create_default_rule_validates_model(
         self,
         client: TestClient,
         admin_headers: dict,
     ):
+        """Default rules also require a valid target_model."""
         tid = uuid4()
-        row = _rule_row(tenant_id=tid, is_default=True, target="fallback-model")
-        with (
-            patch(
-                "bsgateway.rules.repository.RulesRepository.create_rule",
-                new_callable=AsyncMock,
-                return_value=row,
-            ),
-            patch(
-                "bsgateway.rules.repository.RulesRepository.list_conditions",
-                new_callable=AsyncMock,
-                return_value=[],
-            ),
+        with patch(
+            "bsgateway.tenant.repository.TenantRepository.get_model_by_name",
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = client.post(
                 f"/api/v1/tenants/{tid}/rules",
                 json={
                     "name": "default",
                     "priority": 99,
-                    "target_model": "fallback-model",
+                    "target_model": "nonexistent-model",
                     "is_default": True,
                 },
                 headers=admin_headers,
             )
-            assert resp.status_code == 201
+            assert resp.status_code == 400
+            assert "not registered" in resp.json()["detail"]
 
     def test_list_rules(self, client: TestClient, admin_headers: dict):
         tid = uuid4()

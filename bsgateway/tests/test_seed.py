@@ -9,6 +9,10 @@ import pytest
 
 from bsgateway.core.seed import DEV_TENANT_SLUG, seed_dev_data
 
+# Also patch generate_api_key for deterministic tests
+_FAKE_KEY = "bsg_test-seed-key-abc12345"
+_FAKE_PREFIX = "bsg_test-se"
+
 ENCRYPTION_KEY = bytes.fromhex(os.urandom(32).hex())
 
 
@@ -58,10 +62,13 @@ class TestSeedDevData:
         pool.acquire.assert_not_called()
 
     @pytest.mark.asyncio
+    @patch("bsgateway.core.seed.generate_api_key", return_value=(_FAKE_KEY, _FAKE_PREFIX))
     @patch("bsgateway.core.seed.encrypt_value", return_value="encrypted")
     @patch("bsgateway.core.seed.hash_api_key", return_value="hashed")
     @patch("bsgateway.core.seed.TenantRepository")
-    async def test_creates_tenant_and_models(self, mock_repo_cls, mock_hash, mock_encrypt):
+    async def test_creates_tenant_and_models(
+        self, mock_repo_cls, mock_hash, mock_encrypt, _mock_genkey
+    ):
         repo = AsyncMock()
         repo.get_tenant_by_slug = AsyncMock(return_value=None)
         mock_repo_cls.return_value = repo
@@ -79,10 +86,13 @@ class TestSeedDevData:
         assert conn.execute.await_count == 5
 
     @pytest.mark.asyncio
+    @patch("bsgateway.core.seed.generate_api_key", return_value=(_FAKE_KEY, _FAKE_PREFIX))
     @patch("bsgateway.core.seed.encrypt_value", return_value="encrypted")
     @patch("bsgateway.core.seed.hash_api_key", return_value="hashed")
     @patch("bsgateway.core.seed.TenantRepository")
-    async def test_skips_encryption_if_no_key(self, mock_repo_cls, mock_hash, mock_encrypt):
+    async def test_skips_encryption_if_no_key(
+        self, mock_repo_cls, mock_hash, mock_encrypt, _mock_genkey
+    ):
         repo = AsyncMock()
         repo.get_tenant_by_slug = AsyncMock(return_value=None)
         mock_repo_cls.return_value = repo
@@ -97,11 +107,14 @@ class TestSeedDevData:
         mock_encrypt.assert_not_called()
 
     @pytest.mark.asyncio
+    @patch("bsgateway.core.seed.generate_api_key", return_value=(_FAKE_KEY, _FAKE_PREFIX))
     @patch("bsgateway.core.seed.encrypt_value", return_value="encrypted")
     @patch("bsgateway.core.seed.hash_api_key", return_value="hashed")
     @patch("bsgateway.core.seed.TenantRepository")
-    async def test_does_not_log_full_api_key(self, mock_repo_cls, mock_hash, mock_encrypt):
-        """Verify the full API key is not logged (security)."""
+    async def test_logs_api_key_and_prefix(
+        self, mock_repo_cls, mock_hash, mock_encrypt, _mock_genkey
+    ):
+        """Verify the generated API key is logged for dev convenience."""
         repo = AsyncMock()
         repo.get_tenant_by_slug = AsyncMock(return_value=None)
         mock_repo_cls.return_value = repo
@@ -114,8 +127,6 @@ class TestSeedDevData:
         with patch("bsgateway.core.seed.logger") as mock_logger:
             await seed_dev_data(pool, ENCRYPTION_KEY)
 
-            # Verify the full key is not in the log call
             call_kwargs = mock_logger.info.call_args_list[-1].kwargs
-            assert "api_key" not in call_kwargs
-            assert "api_key_prefix" in call_kwargs
-            assert call_kwargs["api_key_prefix"].endswith("...")
+            assert call_kwargs["api_key"] == _FAKE_KEY
+            assert call_kwargs["api_key_prefix"] == _FAKE_PREFIX

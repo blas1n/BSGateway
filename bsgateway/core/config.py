@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # Superadmin bootstrap key (for creating first tenant)
     superadmin_key: str = ""
 
+    # CORS (comma-separated list of allowed origins, e.g. "http://localhost:5173,https://app.example.com")
+    cors_allowed_origins: str = ""
+
+    # Frontend dist directory (for serving dashboard static files)
+    frontend_dist_dir: str = ""
+
     # Development seed data (creates test tenant + API key on startup)
     seed_dev_data: bool = False
 

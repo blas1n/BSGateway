@@ -25,12 +25,15 @@ FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app
 
-RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
 
 # Copy from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /workspace/bsgateway ./bsgateway
 COPY --from=builder /workspace/gateway.yaml .
+
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \

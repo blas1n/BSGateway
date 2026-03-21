@@ -5,12 +5,35 @@ from typing import Any
 
 from bsgateway.rules.models import EvaluationContext, RuleCondition
 
+# Allowed fields for rule conditions — prevents access to internal/dunder attributes
+_ALLOWED_FIELDS: frozenset[str] = frozenset({
+    "user_text",
+    "system_prompt",
+    "all_text",
+    "estimated_tokens",
+    "conversation_turns",
+    "has_code_blocks",
+    "has_error_trace",
+    "tool_count",
+    "tool_names",
+    "original_model",
+    "classified_intent",
+    "detected_language",
+    "hour_of_day",
+    "day_of_week",
+    "daily_cost",
+    "monthly_cost",
+    "request_count_hourly",
+})
+
 
 def evaluate_condition(condition: RuleCondition, ctx: EvaluationContext) -> bool:
     """Evaluate a single condition against the evaluation context.
 
     Returns True if the condition matches (before negate is applied).
     """
+    if condition.field not in _ALLOWED_FIELDS:
+        return False
     result = _evaluate_raw(condition, ctx)
     return (not result) if condition.negate else result
 

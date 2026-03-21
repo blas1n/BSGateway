@@ -35,12 +35,17 @@ class CacheManager:
         self._redis = redis_client
 
     async def get(self, key: str) -> Any | None:
-        """Get value from cache."""
+        """Get value from cache. Returns None on cache miss."""
         try:
             value = await self._redis.get(key)
             if value is None:
                 return None
             return json.loads(value)
+        except json.JSONDecodeError:
+            logger.warning("cache_deserialization_failed", key=key, exc_info=True)
+            # Purge corrupted entry so next read doesn't hit the same error
+            await self.delete(key)
+            return None
         except Exception:
             logger.warning("cache_get_failed", key=key, exc_info=True)
             return None

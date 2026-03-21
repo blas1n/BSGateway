@@ -15,6 +15,7 @@ rules:
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["secrets"]
+  resourceNames: ["bsgateway-secrets"]
   verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

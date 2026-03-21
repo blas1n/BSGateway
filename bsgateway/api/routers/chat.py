@@ -55,7 +55,12 @@ async def chat_completions(
     auth: AuthContext = Depends(get_auth_context),
 ) -> Any:
     """OpenAI-compatible chat completions with tenant-based routing."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return _error_response(
+            400, "Invalid JSON in request body", "invalid_request_error", "invalid_json"
+        )
 
     # Validate messages
     if "messages" not in body or not body["messages"]:
@@ -74,7 +79,8 @@ async def chat_completions(
     if redis:
         from bsgateway.tenant.repository import TenantRepository
 
-        tenant_repo = TenantRepository(pool)
+        cache = getattr(request.app.state, "cache", None)
+        tenant_repo = TenantRepository(pool, cache=cache)
         tenant_row = await tenant_repo.get_tenant(auth.tenant_id)
         if tenant_row:
             import json as json_mod
@@ -86,7 +92,12 @@ async def chat_completions(
                 else (raw_settings or {})
             )
             rate_limit = settings.get("rate_limit", {})
-            rpm = rate_limit.get("requests_per_minute", 0)
+            try:
+                rpm = int(rate_limit.get("requests_per_minute", 0))
+            except (TypeError, ValueError):
+                rpm = 0
+            if not (0 <= rpm <= 100_000):
+                rpm = 0
             if rpm > 0:
                 limiter = RateLimiter(redis)
                 result = await limiter.check(str(auth.tenant_id), rpm)

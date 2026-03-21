@@ -45,11 +45,8 @@ async def _validate_target_model(
     request: Request,
     tenant_id: UUID,
     target_model: str,
-    is_default: bool,
 ) -> None:
-    """Validate that target_model is registered for the tenant (skip for default rules)."""
-    if is_default:
-        return
+    """Validate that target_model is registered for the tenant."""
     tenant_repo = TenantRepository(get_pool(request), cache=get_cache(request))
     model = await tenant_repo.get_model_by_name(tenant_id, target_model)
     if not model:
@@ -138,7 +135,7 @@ async def create_rule(
     request: Request,
     _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
-    await _validate_target_model(request, tenant_id, body.target_model, body.is_default)
+    await _validate_target_model(request, tenant_id, body.target_model)
     repo = _get_repo(request)
     try:
         row = await repo.create_rule(
@@ -325,8 +322,7 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="Rule not found")
 
     final_target = body.target_model or existing["target_model"]
-    final_is_default = body.is_default if body.is_default is not None else existing["is_default"]
-    await _validate_target_model(request, tenant_id, final_target, final_is_default)
+    await _validate_target_model(request, tenant_id, final_target)
 
     row = await repo.update_rule(
         rule_id=rule_id,

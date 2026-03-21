@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import asyncpg
+import jwt as pyjwt
 import structlog
 from fastapi import Depends, HTTPException, Request, status
 
+from bsgateway.core.cache import CacheManager
 from bsgateway.core.security import decode_jwt, hash_api_key
+
+if TYPE_CHECKING:
+    from bsgateway.audit.service import AuditService
 
 logger = structlog.get_logger(__name__)
 
@@ -23,7 +30,7 @@ def get_encryption_key(request: Request) -> bytes:
     return request.app.state.encryption_key
 
 
-def get_cache(request: Request):
+def get_cache(request: Request) -> CacheManager | None:
     """Extract the cache manager from app state (optional)."""
     return getattr(request.app.state, "cache", None)
 
@@ -64,12 +71,12 @@ async def get_auth_context(request: Request) -> AuthContext:
                 scopes=payload.scopes,
                 key_hash="",
             )
-        except Exception:
+        except pyjwt.InvalidTokenError:
             logger.debug("jwt_decode_failed", exc_info=True)
 
     # Check superadmin key (compare hashes, never plaintext)
     superadmin_hash = getattr(request.app.state, "superadmin_key_hash", "")
-    if superadmin_hash and hash_api_key(token) == superadmin_hash:
+    if superadmin_hash and hmac.compare_digest(hash_api_key(token), superadmin_hash):
         return AuthContext(
             tenant_id=UUID("00000000-0000-0000-0000-000000000000"),
             scopes=["admin"],
@@ -132,7 +139,7 @@ def require_admin(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
     return auth
 
 
-def get_audit_service(request: Request):
+def get_audit_service(request: Request) -> AuditService:
     """Create an AuditService instance from the request."""
     from bsgateway.audit.repository import AuditRepository
     from bsgateway.audit.service import AuditService

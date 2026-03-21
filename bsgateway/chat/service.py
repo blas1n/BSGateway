@@ -241,8 +241,13 @@ class ChatService:
 
         response = await litellm.acompletion(**litellm_kwargs)
 
-        # Fire-and-forget: log routing decision + budget tracking
-        task = asyncio.create_task(self._log_request(tenant_id, rule_match, request_data, model))
+        # Fire-and-forget: log routing decision + budget tracking (30s timeout)
+        task = asyncio.create_task(
+            asyncio.wait_for(
+                self._log_request(tenant_id, rule_match, request_data, model),
+                timeout=30.0,
+            )
+        )
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 

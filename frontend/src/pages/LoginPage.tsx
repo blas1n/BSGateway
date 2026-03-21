@@ -28,8 +28,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.detail || 'Authentication failed');
+        if (res.status === 401) {
+          throw new Error('Invalid API key');
+        }
+        throw new Error('Authentication failed. Please try again.');
       }
 
       const data = await res.json();
