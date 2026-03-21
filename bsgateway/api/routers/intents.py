@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_tenant_access
+from bsgateway.api.deps import AuthContext, get_cache, get_pool, require_tenant_access
 from bsgateway.rules.repository import RulesRepository
 from bsgateway.rules.schemas import (
     ExampleCreate,
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/tenants/{tenant_id}/intents", tags=["intents"])
 
 
 def _get_repo(request: Request) -> RulesRepository:
-    return RulesRepository(get_pool(request))
+    return RulesRepository(get_pool(request), cache=get_cache(request))
 
 
 def _to_response(row: asyncpg.Record) -> IntentResponse:

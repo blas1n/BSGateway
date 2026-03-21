@@ -163,6 +163,7 @@ class BSGatewayRouter:
         self.config = config or load_routing_config()
         self.classifier = classifier or create_classifier(self.config)
         self._tier_map = {t.name: t for t in self.config.tiers}
+        self._background_tasks: set[asyncio.Task] = set()
 
         if self.config.collector.enabled:
             from bsgateway.core.config import settings
@@ -278,9 +279,12 @@ class BSGatewayRouter:
             tier=result.tier,
         )
 
-        # Record asynchronously (non-blocking)
+        # Record asynchronously (non-blocking), track for graceful shutdown
         if self.collector:
-            _task = asyncio.create_task(self.collector.record(data, result, decision))  # noqa: RUF006
+            _task = asyncio.create_task(self.collector.record(data, result, decision))
+            if hasattr(self, "_background_tasks"):
+                self._background_tasks.add(_task)
+                _task.add_done_callback(self._background_tasks.discard)
 
         return decision
 

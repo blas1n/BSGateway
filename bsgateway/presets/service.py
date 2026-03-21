@@ -87,15 +87,22 @@ class PresetService:
                         )
                         examples_created += 1
 
+                # Get max existing priority to avoid UNIQUE constraint violations
+                max_priority_row = await conn.fetchval(
+                    "SELECT COALESCE(MAX(priority), -1) FROM routing_rules WHERE tenant_id = $1",
+                    tenant_id,
+                )
+                base_priority = max_priority_row + 1
+
                 # Create rules with concrete model names
-                for priority, rule_def in enumerate(preset.rules):
+                for offset, rule_def in enumerate(preset.rules):
                     concrete_model = model_mapping.resolve(rule_def.target_level)
 
                     rule_row = await conn.fetchrow(
                         self._repo._sql.query("insert_rule"),
                         tenant_id,
                         rule_def.name,
-                        priority,
+                        base_priority + offset,
                         rule_def.is_default,
                         concrete_model,
                     )

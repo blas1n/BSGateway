@@ -88,6 +88,7 @@ class CacheManager:
                 await self._redis.setex(key, int(ttl.total_seconds()), serialized)
             else:
                 await self._redis.set(key, serialized)
+            self._record_success()
             return True
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
             self._record_failure("set", key=key)
@@ -99,16 +100,20 @@ class CacheManager:
             keys = [key] if isinstance(key, str) else key
             if keys:
                 await self._redis.delete(*keys)
+            self._record_success()
             return True
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
-            logger.warning("cache_delete_failed", exc_info=True)
+            self._record_failure("delete", key=str(key))
             return False
 
     async def exists(self, key: str) -> bool:
         """Check if key exists in cache."""
         try:
-            return bool(await self._redis.exists(key))
+            result = await self._redis.exists(key)
+            self._record_success()
+            return bool(result)
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
+            self._record_failure("exists", key=key)
             return False
 
     async def get_or_fetch(
@@ -135,9 +140,11 @@ class CacheManager:
     async def increment(self, key: str, amount: int = 1) -> int:
         """Increment integer value (for counters)."""
         try:
-            return await self._redis.incrby(key, amount)
+            result = await self._redis.incrby(key, amount)
+            self._record_success()
+            return result
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
-            logger.warning("cache_increment_failed", key=key, exc_info=True)
+            self._record_failure("increment", key=key)
             return 0
 
 

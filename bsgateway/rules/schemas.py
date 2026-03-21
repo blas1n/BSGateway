@@ -174,14 +174,22 @@ class RuleTestResponse(BaseModel):
 
 class IntentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
     threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    examples: list[str] = Field(default_factory=list)
+    examples: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("examples")
+    @classmethod
+    def validate_example_lengths(cls, v: list[str]) -> list[str]:
+        for ex in v:
+            if len(ex) > 5000:
+                raise ValueError("example text exceeds 5000 characters")
+        return v
 
 
 class IntentUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
-    description: str | None = None
+    description: str | None = Field(None, max_length=2000)
     threshold: float | None = Field(None, ge=0.0, le=1.0)
 
 
@@ -197,7 +205,7 @@ class IntentResponse(BaseModel):
 
 
 class ExampleCreate(BaseModel):
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=5000)
 
 
 class ExampleResponse(BaseModel):

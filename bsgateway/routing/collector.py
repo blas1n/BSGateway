@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import struct
 from pathlib import Path
@@ -73,18 +74,22 @@ class RoutingCollector:
         self.embedding_config = embedding_config
         self._pool: asyncpg.Pool = None  # type: ignore[assignment]
         self._initialized = False
+        self._init_lock = asyncio.Lock()
 
     async def _ensure_db(self) -> None:
         if self._initialized:
             return
-        self._pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5)
-        schema = sql.schema()
-        async with self._pool.acquire() as conn:
-            for statement in schema.split(";"):
-                statement = statement.strip()
-                if statement:
-                    await conn.execute(statement)
-        self._initialized = True
+        async with self._init_lock:
+            if self._initialized:
+                return
+            self._pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5)
+            schema = sql.schema()
+            async with self._pool.acquire() as conn:
+                for statement in schema.split(";"):
+                    statement = statement.strip()
+                    if statement:
+                        await conn.execute(statement)
+            self._initialized = True
 
     async def record(
         self,

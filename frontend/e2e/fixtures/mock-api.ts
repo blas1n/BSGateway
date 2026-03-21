@@ -67,7 +67,7 @@ export const MOCK_RULES = [
     conditions: [
       {
         id: 'c-001',
-        condition_type: 'keyword',
+        condition_type: 'text_pattern',
         field: 'content',
         operator: 'contains',
         value: 'urgent',
@@ -97,8 +97,6 @@ export const MOCK_INTENTS = [
     tenant_id: TENANT.id,
     name: 'summarization',
     description: 'Requests asking to summarize content',
-    examples: ['Please summarize this article', 'TL;DR of the above'],
-    target_model: 'gpt-4o',
     threshold: 0.7,
     is_active: true,
     created_at: '2026-03-17T10:00:00+00:00',
@@ -109,8 +107,6 @@ export const MOCK_INTENTS = [
     tenant_id: TENANT.id,
     name: 'code-generation',
     description: 'Requests to generate code',
-    examples: ['Write a function that...'],
-    target_model: 'claude-sonnet',
     threshold: 0.7,
     is_active: false,
     created_at: '2026-03-17T10:00:00+00:00',
@@ -121,7 +117,6 @@ export const MOCK_INTENTS = [
 export const MOCK_USAGE = {
   total_requests: 1247,
   total_tokens: 523800,
-  success_rate: 0.986,
   by_model: {
     'gpt-4o': { requests: 520, tokens: 218400 },
     'claude-sonnet': { requests: 430, tokens: 180600 },
@@ -170,7 +165,7 @@ export const MOCK_AUDIT_LOGS = [
     action: 'model.deleted',
     resource_type: 'model',
     resource_id: 'old-model-id-12345',
-    details: null,
+    details: {},
     created_at: '2026-03-19T14:00:00+00:00',
   },
 ];
@@ -368,9 +363,7 @@ export async function setupApiMocks(page: Page) {
         id: `i-${Date.now()}`,
         tenant_id: TENANT.id,
         name: body.name,
-        description: body.description || null,
-        examples: body.examples || [],
-        target_model: body.target_model || null,
+        description: body.description || '',
         threshold: body.threshold ?? 0.7,
         is_active: true,
         created_at: new Date().toISOString(),

@@ -149,8 +149,10 @@ class TestAuthToken:
             repo = mock_repo_cls.return_value
             repo.get_api_key_by_hash = AsyncMock(return_value=None)
 
-            for _ in range(10):
-                client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
+            responses = [
+                client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY}) for _ in range(10)
+            ]
+            assert all(r.status_code in (200, 401) for r in responses)
 
             res = client.post("/api/v1/auth/token", json={"api_key": TEST_API_KEY})
 
@@ -172,3 +174,4 @@ class TestAuthToken:
         payload = decode_jwt(token, "test-jwt-secret-that-is-long-enough")
         assert payload.tenant_id == str(row["tenant_id"])
         assert payload.scopes == ["chat", "admin"]
+        repo.touch_api_key.assert_called_once()

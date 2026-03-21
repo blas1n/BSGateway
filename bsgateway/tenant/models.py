@@ -130,7 +130,9 @@ class TenantModelCreate(BaseModel):
         description="LiteLLM model ID in format provider/model (e.g., 'openai/gpt-4o')",
     )
     api_key: str | None = Field(
-        None, description="API key for the model provider (optional, encrypted at rest)"
+        None,
+        max_length=4096,
+        description="API key for the model provider (optional, encrypted at rest)",
     )
     api_base: str | None = Field(
         None, description="Custom API base URL for non-standard endpoints (optional)"

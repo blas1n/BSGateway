@@ -152,15 +152,15 @@ export interface DailyUsage {
 export interface UsageResponse {
   total_requests: number;
   total_tokens: number;
-  success_rate?: number;
   by_model: Record<string, ModelUsage>;
   by_rule: Record<string, number>;
   daily_breakdown: DailyUsage[];
 }
 
 export interface AuthToken {
-  access_token: string;
-  token_type: string;
+  token: string;
   tenant_id: string;
+  tenant_slug: string;
+  tenant_name: string;
   scopes: string[];
 }
