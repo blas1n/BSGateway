@@ -64,7 +64,7 @@ async def create_tenant(
     audit = get_audit_service(request)
     await audit.record(
         result.id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "tenant.created",
         "tenant",
         str(result.id),
@@ -131,7 +131,7 @@ async def deactivate_tenant(
     audit = get_audit_service(request)
     await audit.record(
         tenant_id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "tenant.deactivated",
         "tenant",
         str(tenant_id),
@@ -215,7 +215,7 @@ async def create_model(
     provider = body.litellm_model.split("/")[0] if "/" in body.litellm_model else "unknown"
     await audit.record(
         tenant_id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "model.created",
         "model",
         str(result.id),
@@ -290,7 +290,7 @@ async def delete_model(
     audit = get_audit_service(request)
     await audit.record(
         tenant_id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "model.deleted",
         "model",
         str(model_id),

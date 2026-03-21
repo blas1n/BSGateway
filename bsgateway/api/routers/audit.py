@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import Any
 from uuid import UUID
 
 import structlog
@@ -11,6 +9,7 @@ from pydantic import BaseModel
 
 from bsgateway.api.deps import AuthContext, get_pool, require_tenant_access
 from bsgateway.audit.repository import AuditRepository
+from bsgateway.core.utils import safe_json_loads
 
 logger = structlog.get_logger(__name__)
 
@@ -34,17 +33,6 @@ class AuditLogResponse(BaseModel):
 class AuditLogListResponse(BaseModel):
     items: list[AuditLogResponse]
     total: int
-
-
-def _safe_json_loads(raw: str | dict | None) -> dict[str, Any]:
-    if raw is None:
-        return {}
-    if isinstance(raw, dict):
-        return raw
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {}
 
 
 @router.get("", response_model=AuditLogListResponse, summary="List audit logs")
@@ -71,7 +59,7 @@ async def list_audit_logs(
             action=row["action"],
             resource_type=row["resource_type"],
             resource_id=row["resource_id"],
-            details=_safe_json_loads(row["details"]),
+            details=safe_json_loads(row["details"]),
             created_at=row["created_at"].isoformat() if row["created_at"] else "",
         )
         for row in rows

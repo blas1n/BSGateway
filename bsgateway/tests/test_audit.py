@@ -15,6 +15,7 @@ from bsgateway.api.app import create_app
 from bsgateway.audit.repository import AuditRepository
 from bsgateway.audit.service import AuditService
 from bsgateway.core.security import hash_api_key
+from bsgateway.tests.conftest import make_mock_pool
 
 SUPERADMIN_KEY = "test-superadmin-key"
 ENCRYPTION_KEY_HEX = os.urandom(32).hex()
@@ -22,12 +23,8 @@ TENANT_ID = uuid4()
 
 
 @pytest.fixture
-def mock_pool() -> AsyncMock:
-    pool = AsyncMock()
-    pool._closed = False
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+def mock_pool():
+    pool, _conn = make_mock_pool()
     return pool
 
 
@@ -337,3 +334,29 @@ class TestAuditWiring:
         mock_audit.assert_called_once()
         call_args = mock_audit.call_args
         assert call_args[0][2] == "model.deleted"
+
+
+class TestAuditInitSchema:
+    """Test AuditRepository.init_schema."""
+
+    async def test_init_schema_executes(self):
+        """init_schema reads the SQL file and calls execute_schema."""
+        pool = AsyncMock()
+
+        with (
+            patch(
+                "bsgateway.audit.repository.execute_schema",
+                new_callable=AsyncMock,
+            ) as mock_exec,
+            patch(
+                "pathlib.Path.read_text",
+                return_value="CREATE TABLE IF NOT EXISTS audit_logs (...);",
+            ),
+        ):
+            repo = AuditRepository(pool)
+            await repo.init_schema()
+
+        mock_exec.assert_called_once_with(
+            pool,
+            "CREATE TABLE IF NOT EXISTS audit_logs (...);",
+        )

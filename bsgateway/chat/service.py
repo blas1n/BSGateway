@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
@@ -9,7 +8,13 @@ from uuid import UUID
 
 import structlog
 
+try:
+    import litellm
+except ImportError:  # pragma: no cover
+    litellm = None  # type: ignore[assignment]
+
 from bsgateway.core.security import decrypt_value
+from bsgateway.core.utils import parse_jsonb_value, safe_json_loads
 from bsgateway.routing.collector import SqlLoader
 from bsgateway.rules.engine import RuleEngine
 from bsgateway.rules.models import (
@@ -30,27 +35,6 @@ logger = structlog.get_logger(__name__)
 _tenant_sql = SqlLoader()
 _rules_sql = SqlLoader()
 _log_sql = SqlLoader()
-
-
-def _parse_value(raw: Any) -> Any:
-    """Parse JSONB value from DB record."""
-    if isinstance(raw, str):
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return raw
-    return raw
-
-
-def _safe_json_loads(raw: str | dict | None) -> dict:
-    if raw is None:
-        return {}
-    if isinstance(raw, dict):
-        return raw
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {}
 
 
 class ChatService:
@@ -107,7 +91,7 @@ class ChatService:
                     condition_type=c["condition_type"],
                     field=c["field"],
                     operator=c["operator"],
-                    value=_parse_value(c["value"]),
+                    value=parse_jsonb_value(c["value"]),
                     negate=c["negate"],
                 )
                 for c in cond_by_rule.get(r["id"], [])
@@ -134,10 +118,10 @@ class ChatService:
                 litellm_model=m["litellm_model"],
                 api_key_encrypted=m["api_key_encrypted"],
                 api_base=m["api_base"],
-                extra_params=_safe_json_loads(m["extra_params"]),
+                extra_params=safe_json_loads(m["extra_params"]),
             )
 
-        settings = _safe_json_loads(tenant_row["settings"]) if tenant_row else {}
+        settings = safe_json_loads(tenant_row["settings"]) if tenant_row else {}
 
         return TenantConfig(
             tenant_id=str(tenant_id),
@@ -183,7 +167,12 @@ class ChatService:
         request_data: dict,
     ) -> Any:
         """Full pipeline: load config → resolve model → call litellm."""
-        import litellm  # runtime import: optional heavy dependency
+        if litellm is None:
+            raise ChatError(
+                "litellm is not installed",
+                code="dependency_missing",
+                status_code=500,
+            )
 
         tenant_config = await self.load_tenant_config(tenant_id)
 

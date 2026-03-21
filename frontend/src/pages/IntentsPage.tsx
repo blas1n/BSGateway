@@ -29,6 +29,11 @@ export function IntentsPage() {
     setSubmitting(true);
     setCreateError(null);
     try {
+      if (!formData.name.trim()) {
+        setCreateError('Name is required');
+        setSubmitting(false);
+        return;
+      }
       await intentsApi.create(tenantId, {
         ...formData,
         examples: formData.examples.filter(e => e.trim()),

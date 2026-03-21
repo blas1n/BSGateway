@@ -33,6 +33,22 @@ class CacheManager:
 
     def __init__(self, redis_client: redis.Redis):
         self._redis = redis_client
+        self._consecutive_failures = 0
+
+    def _record_success(self) -> None:
+        if self._consecutive_failures > 0:
+            logger.info("cache_recovered", previous_failures=self._consecutive_failures)
+        self._consecutive_failures = 0
+
+    def _record_failure(self, operation: str, **kwargs: Any) -> None:
+        self._consecutive_failures += 1
+        level = "warning" if self._consecutive_failures < 5 else "error"
+        getattr(logger, level)(
+            f"cache_{operation}_failed",
+            consecutive_failures=self._consecutive_failures,
+            exc_info=True,
+            **kwargs,
+        )
 
     async def get(self, key: str) -> Any | None:
         """Get value from cache. Returns None on cache miss."""
@@ -40,14 +56,14 @@ class CacheManager:
             value = await self._redis.get(key)
             if value is None:
                 return None
+            self._record_success()
             return json.loads(value)
         except json.JSONDecodeError:
             logger.warning("cache_deserialization_failed", key=key, exc_info=True)
-            # Purge corrupted entry so next read doesn't hit the same error
             await self.delete(key)
             return None
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
-            logger.warning("cache_get_failed", key=key, exc_info=True)
+            self._record_failure("get", key=key)
             return None
 
     async def set(
@@ -65,7 +81,7 @@ class CacheManager:
                 await self._redis.set(key, serialized)
             return True
         except (redis.RedisError, ConnectionError, TimeoutError, OSError):
-            logger.warning("cache_set_failed", key=key, exc_info=True)
+            self._record_failure("set", key=key)
             return False
 
     async def delete(self, key: str | list[str]) -> bool:
@@ -125,16 +141,6 @@ def cache_key_rules(tenant_id: str) -> str:
 def cache_key_models(tenant_id: str) -> str:
     """Cache key for tenant models."""
     return f"cache:models:{tenant_id}"
-
-
-def cache_key_usage(tenant_id: str, period: str) -> str:
-    """Cache key for usage statistics."""
-    return f"cache:usage:{tenant_id}:{period}"
-
-
-def cache_key_tenant_config(tenant_id: str) -> str:
-    """Cache key for tenant config (rules + models)."""
-    return f"cache:tenant_config:{tenant_id}"
 
 
 # Cache TTLs

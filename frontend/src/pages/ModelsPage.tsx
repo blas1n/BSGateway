@@ -22,6 +22,10 @@ export function ModelsPage() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const handleCreate = async () => {
+    if (!formData.model_name.trim() || !formData.litellm_model.trim()) {
+      setCreateError('Alias and model name are required');
+      return;
+    }
     setSubmitting(true);
     setCreateError(null);
     try {
@@ -67,7 +71,7 @@ export function ModelsPage() {
                 placeholder="gpt-4o"
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               />
-              <p className="text-xs text-gray-400 mt-1">Tenant 내부에서 사용할 이름</p>
+              <p className="text-xs text-gray-400 mt-1">Internal alias for this model</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
@@ -78,7 +82,7 @@ export function ModelsPage() {
                 placeholder="openai/gpt-4o"
                 className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
               />
-              <p className="text-xs text-gray-400 mt-1">LiteLLM 모델 ID (provider/model)</p>
+              <p className="text-xs text-gray-400 mt-1">LiteLLM model ID (provider/model)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

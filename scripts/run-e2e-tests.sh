@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 # Configurable ports and temp directory
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-TMP_DIR="${E2E_TMP_DIR:-$(mktemp -d)}"
+TMP_DIR="${E2E_TMP_DIR:-$(mktemp -d)}" || { echo -e "${RED}Failed to create temp directory${NC}"; exit 1; }
 mkdir -p "$TMP_DIR"
 
 # Cleanup on exit or signal

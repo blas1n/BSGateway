@@ -197,11 +197,17 @@ export function RoutingTestPage() {
             <div className="border-t pt-4">
               <p className="text-sm font-semibold text-gray-700 mb-2">Evaluation Trace</p>
               <div className="space-y-1">
-                {result.evaluation_trace.map((entry, i) => (
-                  <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1">
-                    {JSON.stringify(entry)}
-                  </div>
-                ))}
+                {result.evaluation_trace.map((entry, i) => {
+                  const safeEntry: Record<string, unknown> = {};
+                  for (const [k, v] of Object.entries(entry)) {
+                    safeEntry[k] = typeof v === 'string' ? v : JSON.stringify(v);
+                  }
+                  return (
+                    <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1 whitespace-pre-wrap break-all">
+                      {JSON.stringify(safeEntry)}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

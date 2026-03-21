@@ -24,6 +24,10 @@ export function RulesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const handleCreate = async () => {
+    if (!formData.name.trim() || !formData.target_model.trim()) {
+      setCreateError('Name and target model are required');
+      return;
+    }
     setSubmitting(true);
     setCreateError(null);
     try {

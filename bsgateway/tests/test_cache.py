@@ -15,8 +15,6 @@ from bsgateway.core.cache import (
     _CacheEncoder,
     cache_key_models,
     cache_key_rules,
-    cache_key_tenant_config,
-    cache_key_usage,
 )
 
 
@@ -226,12 +224,6 @@ class TestCacheKeyFunctions:
 
     def test_cache_key_models(self):
         assert cache_key_models("t1") == "cache:models:t1"
-
-    def test_cache_key_usage(self):
-        assert cache_key_usage("t1", "2026-03") == "cache:usage:t1:2026-03"
-
-    def test_cache_key_tenant_config(self):
-        assert cache_key_tenant_config("t1") == "cache:tenant_config:t1"
 
     def test_cache_ttl_rules_is_timedelta(self):
         assert isinstance(CACHE_TTL_RULES, timedelta)

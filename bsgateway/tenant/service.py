@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from json import JSONDecodeError
 from uuid import UUID
 
 import asyncpg
@@ -13,6 +11,7 @@ from bsgateway.core.security import (
     generate_api_key,
     hash_api_key,
 )
+from bsgateway.core.utils import safe_json_loads
 from bsgateway.tenant.models import (
     ApiKeyCreatedResponse,
     ApiKeyResponse,
@@ -26,21 +25,8 @@ from bsgateway.tenant.repository import TenantRepository
 logger = structlog.get_logger(__name__)
 
 
-def _safe_json_loads(raw: str | dict | None, fallback: dict | None = None) -> dict:
-    """Safely parse JSON string, returning fallback on error."""
-    if raw is None:
-        return fallback or {}
-    if isinstance(raw, dict):
-        return raw
-    try:
-        return json.loads(raw)
-    except (JSONDecodeError, TypeError):
-        logger.warning("json_parse_failed", raw_type=type(raw).__name__)
-        return fallback or {}
-
-
 def _record_to_tenant(row: asyncpg.Record) -> TenantResponse:
-    settings = _safe_json_loads(row["settings"])
+    settings = safe_json_loads(row["settings"])
     return TenantResponse(
         id=row["id"],
         name=row["name"],
@@ -53,7 +39,7 @@ def _record_to_tenant(row: asyncpg.Record) -> TenantResponse:
 
 
 def _record_to_model(row: asyncpg.Record) -> TenantModelResponse:
-    extra_params = _safe_json_loads(row["extra_params"])
+    extra_params = safe_json_loads(row["extra_params"])
     return TenantModelResponse(
         id=row["id"],
         tenant_id=row["tenant_id"],
@@ -205,7 +191,7 @@ class TenantService:
                 raise ValueError("ENCRYPTION_KEY is required to store provider API keys")
             encrypted_key = encrypt_value(data.api_key, self._encryption_key)
 
-        existing_extra = _safe_json_loads(existing["extra_params"])
+        existing_extra = safe_json_loads(existing["extra_params"])
 
         new_litellm_model = data.litellm_model or existing["litellm_model"]
         new_provider = new_litellm_model.split("/")[0] if "/" in new_litellm_model else "unknown"

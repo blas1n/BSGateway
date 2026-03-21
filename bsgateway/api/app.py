@@ -107,12 +107,16 @@ async def lifespan(app: FastAPI):
 
     # Drain background tasks before closing connections
     if app.state.background_tasks:
-        logger.info("draining_background_tasks", count=len(app.state.background_tasks))
+        total = len(app.state.background_tasks)
+        logger.info("draining_background_tasks", count=total)
         _done, _pending = await asyncio.wait(app.state.background_tasks, timeout=25.0)
-        if _pending:
-            logger.warning("background_tasks_timed_out", count=len(_pending))
-            for t in _pending:
-                t.cancel()
+        logger.info(
+            "background_tasks_drained",
+            completed=len(_done),
+            timed_out=len(_pending),
+        )
+        for t in _pending:
+            t.cancel()
 
     # Cleanup Redis
     if app.state.redis:

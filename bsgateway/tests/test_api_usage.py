@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from bsgateway.api.app import create_app
 from bsgateway.core.security import hash_api_key
+from bsgateway.tests.conftest import make_mock_pool
 
 SUPERADMIN_KEY = "test-superadmin-key"
 ENCRYPTION_KEY_HEX = os.urandom(32).hex()
@@ -37,12 +38,8 @@ def _make_api_key_row(tenant_id=None, scopes=None):
 
 
 @pytest.fixture
-def mock_pool() -> AsyncMock:
-    pool = AsyncMock()
-    pool._closed = False
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+def mock_pool():
+    pool, _conn = make_mock_pool()
     return pool
 
 

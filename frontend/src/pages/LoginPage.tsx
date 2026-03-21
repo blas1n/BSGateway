@@ -1,4 +1,13 @@
 import { useState } from 'react';
+import { api, ApiError } from '../api/client';
+
+interface TokenResponse {
+  token: string;
+  tenant_id: string;
+  tenant_slug: string;
+  tenant_name: string;
+  scopes: string[];
+}
 
 interface LoginPageProps {
   onLogin: (token: string, tenantId: string, tenantSlug: string, tenantName: string) => void;
@@ -21,23 +30,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setError('');
 
     try {
-      const res = await fetch('/api/v1/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey }),
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error('Invalid API key');
-        }
-        throw new Error('Authentication failed. Please try again.');
-      }
-
-      const data = await res.json();
+      const data = await api.post<TokenResponse>('/auth/token', { api_key: apiKey });
       onLogin(data.token, data.tenant_id, data.tenant_slug, data.tenant_name);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Invalid API key');
+      } else {
+        setError(err instanceof Error ? err.message : 'Authentication failed');
+      }
     } finally {
       setLoading(false);
     }

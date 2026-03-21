@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from collections import defaultdict
-from typing import Any
 from uuid import UUID
 
 import asyncpg
@@ -16,6 +14,7 @@ from bsgateway.api.deps import (
     require_tenant_access,
 )
 from bsgateway.core.exceptions import DuplicateError
+from bsgateway.core.utils import parse_jsonb_value
 from bsgateway.rules.engine import RuleEngine
 from bsgateway.rules.models import (
     EvaluationContext,
@@ -57,24 +56,13 @@ async def _validate_target_model(
         )
 
 
-def _parse_value(raw: Any) -> Any:
-    """Parse JSONB value from DB record."""
-    if isinstance(raw, str):
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return raw
-    return raw
-
-
 async def _build_rule_response(
     repo: RulesRepository,
     row: asyncpg.Record,
     tenant_id: UUID,
 ) -> RuleResponse:
-    """Build a single rule response (fetches conditions individually)."""
-    conditions = await repo.list_conditions(row["id"])
-    return _row_to_rule_response(row, conditions)
+    """Build a single rule response using batch fetch (avoids N+1)."""
+    return (await _build_rule_responses_batch(repo, [row], tenant_id))[0]
 
 
 def _row_to_rule_response(
@@ -96,7 +84,7 @@ def _row_to_rule_response(
                 condition_type=c["condition_type"],
                 field=c["field"],
                 operator=c["operator"],
-                value=_parse_value(c["value"]),
+                value=parse_jsonb_value(c["value"]),
                 negate=c["negate"],
             )
             for c in conditions
@@ -158,7 +146,7 @@ async def create_rule(
     audit = get_audit_service(request)
     await audit.record(
         tenant_id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "rule.created",
         "rule",
         str(row["id"]),
@@ -208,7 +196,7 @@ async def test_rules(
                 condition_type=c["condition_type"],
                 field=c["field"],
                 operator=c["operator"],
-                value=_parse_value(c["value"]),
+                value=parse_jsonb_value(c["value"]),
                 negate=c["negate"],
             )
             for c in cond_by_rule.get(r["id"], [])
@@ -357,7 +345,7 @@ async def delete_rule(
     audit = get_audit_service(request)
     await audit.record(
         tenant_id,
-        _auth.key_hash or "superadmin",
+        str(_auth.tenant_id),
         "rule.deleted",
         "rule",
         str(rule_id),

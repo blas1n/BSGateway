@@ -17,6 +17,7 @@ from bsgateway.api.deps import (
 )
 from bsgateway.chat.ratelimit import RateLimiter
 from bsgateway.chat.service import ChatError, ChatService
+from bsgateway.core.utils import safe_json_loads
 from bsgateway.tenant.repository import TenantRepository
 
 logger = structlog.get_logger(__name__)
@@ -65,10 +66,7 @@ async def _check_rate_limit(
     if not tenant_row:
         return None
 
-    raw_settings = tenant_row["settings"]
-    tenant_settings = (
-        json.loads(raw_settings) if isinstance(raw_settings, str) else (raw_settings or {})
-    )
+    tenant_settings = safe_json_loads(tenant_row["settings"])
     rate_limit = tenant_settings.get("rate_limit", {})
     try:
         rpm = int(rate_limit.get("requests_per_minute", 0))

@@ -24,8 +24,7 @@ export default defineConfig({
           // UI libraries
           if (id.includes('node_modules/@headlessui/react')) return 'ui_vendor'
           if (id.includes('node_modules/@heroicons/react')) return 'ui_vendor'
-          // Utilities
-          if (id.includes('node_modules/axios')) return 'utils_vendor'
+          // (additional vendor splits can be added here)
         },
       },
     },

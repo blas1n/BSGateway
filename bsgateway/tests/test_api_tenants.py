@@ -15,20 +15,16 @@ from fastapi.testclient import TestClient
 
 from bsgateway.api.app import create_app
 from bsgateway.core.security import hash_api_key
+from bsgateway.tests.conftest import make_mock_pool
 
 SUPERADMIN_KEY = "test-superadmin-key"
 ENCRYPTION_KEY_HEX = os.urandom(32).hex()
 
 
 @pytest.fixture
-def mock_pool() -> AsyncMock:
+def mock_pool():
     """Create a mock asyncpg pool."""
-    pool = AsyncMock()
-    pool._closed = False
-    # Mock connection context manager
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+    pool, _conn = make_mock_pool()
     return pool
 
 
@@ -521,3 +517,134 @@ class TestModelEndpoints:
                 headers=admin_headers,
             )
             assert resp.status_code == 204
+
+
+class TestUpdateTenant:
+    def test_update_tenant_not_found_on_get(self, client: TestClient, admin_headers: dict):
+        """PATCH tenant returns 404 when get_tenant finds nothing."""
+        tid = uuid4()
+        with patch(
+            "bsgateway.tenant.service.TenantService.get_tenant",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}",
+                json={"name": "Updated"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 404
+        assert "Tenant not found" in resp.json()["detail"]
+
+    def test_update_tenant_not_found_on_update(self, client: TestClient, admin_headers: dict):
+        """PATCH tenant returns 404 when update_tenant returns None."""
+        from bsgateway.tenant.models import TenantResponse
+
+        tid = uuid4()
+        now = datetime.now(UTC)
+        existing = TenantResponse(
+            id=tid,
+            name="Acme",
+            slug="acme",
+            is_active=True,
+            settings={},
+            created_at=now,
+            updated_at=now,
+        )
+        with (
+            patch(
+                "bsgateway.tenant.service.TenantService.get_tenant",
+                new_callable=AsyncMock,
+                return_value=existing,
+            ),
+            patch(
+                "bsgateway.tenant.service.TenantService.update_tenant",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}",
+                json={"name": "Updated"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 404
+        assert "Tenant not found" in resp.json()["detail"]
+
+
+class TestModelErrorCases:
+    def test_create_model_duplicate_error(self, client: TestClient, admin_headers: dict):
+        """POST model returns 409 on DuplicateError."""
+        from bsgateway.core.exceptions import DuplicateError
+
+        tid = uuid4()
+        with patch(
+            "bsgateway.tenant.service.TenantService.create_model",
+            new_callable=AsyncMock,
+            side_effect=DuplicateError("Model name already exists"),
+        ):
+            resp = client.post(
+                f"/api/v1/tenants/{tid}/models",
+                json={
+                    "model_name": "my-gpt4",
+                    "litellm_model": "openai/gpt-4o",
+                    "api_key": "sk-test",
+                },
+                headers=admin_headers,
+            )
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
+
+    def test_create_model_value_error(self, client: TestClient, admin_headers: dict):
+        """POST model returns 400 on ValueError."""
+        tid = uuid4()
+        with patch(
+            "bsgateway.tenant.service.TenantService.create_model",
+            new_callable=AsyncMock,
+            side_effect=ValueError("ENCRYPTION_KEY is required"),
+        ):
+            resp = client.post(
+                f"/api/v1/tenants/{tid}/models",
+                json={
+                    "model_name": "my-gpt4",
+                    "litellm_model": "openai/gpt-4o",
+                    "api_key": "sk-test",
+                },
+                headers=admin_headers,
+            )
+        assert resp.status_code == 400
+        assert "ENCRYPTION_KEY" in resp.json()["detail"]
+
+    def test_update_model_not_found(self, client: TestClient, admin_headers: dict):
+        """PATCH model returns 404 when update_model returns None."""
+        tid = uuid4()
+        mid = uuid4()
+        with patch(
+            "bsgateway.tenant.service.TenantService.update_model",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}/models/{mid}",
+                json={"model_name": "updated-model"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 404
+        assert "Model not found" in resp.json()["detail"]
+
+    def test_update_model_value_error(self, client: TestClient, admin_headers: dict):
+        """PATCH model returns 400 on ValueError."""
+        tid = uuid4()
+        mid = uuid4()
+        with patch(
+            "bsgateway.tenant.service.TenantService.update_model",
+            new_callable=AsyncMock,
+            side_effect=ValueError("ENCRYPTION_KEY is required to store provider API keys"),
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}/models/{mid}",
+                json={"api_key": "sk-new-key"},
+                headers=admin_headers,
+            )
+        assert resp.status_code == 400
+        assert "ENCRYPTION_KEY" in resp.json()["detail"]
