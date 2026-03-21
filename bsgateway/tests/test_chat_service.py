@@ -498,13 +498,19 @@ class TestLogRequest:
                 ),
             )
 
-    async def test_log_request_with_redis(self):
-        """Verify _log_request works when redis is present (budget tracking is TODO)."""
+    async def test_budget_tracking_with_redis(self):
+        """Verify _log_request increments budget tracker when redis is present."""
         pool = _make_pool()
         mock_redis = AsyncMock()
         svc = ChatService(pool, ENCRYPTION_KEY, redis=mock_redis)
 
-        with patch("bsgateway.chat.service._log_sql") as mock_log_sql:
+        with (
+            patch("bsgateway.chat.service._log_sql") as mock_log_sql,
+            patch(
+                "bsgateway.rules.budget.BudgetTracker.increment_request_count",
+                new_callable=AsyncMock,
+            ) as mock_budget,
+        ):
             mock_log_sql.query.side_effect = lambda q: q
 
             await svc._log_request(
@@ -517,3 +523,5 @@ class TestLogRequest:
                     litellm_model="openai/gpt-4o",
                 ),
             )
+
+        mock_budget.assert_called_once_with(str(TENANT_ID))

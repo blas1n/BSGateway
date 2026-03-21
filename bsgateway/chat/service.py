@@ -298,8 +298,17 @@ class ChatService:
         except Exception:
             logger.error("routing_log_unexpected_error", exc_info=True)
 
-        # Budget tracking (placeholder — BudgetTracker not yet implemented)
-        # TODO: implement bsgateway.rules.budget.BudgetTracker
+        # Budget tracking
+        if self._redis:
+            try:
+                from bsgateway.rules.budget import BudgetTracker
+
+                tracker = BudgetTracker(self._redis)
+                await tracker.increment_request_count(str(tenant_id))
+            except (ConnectionError, TimeoutError, OSError):
+                logger.warning("budget_tracking_failed", exc_info=True)
+            except Exception:
+                logger.error("budget_tracking_unexpected_error", exc_info=True)
 
 
 class ChatError(Exception):
