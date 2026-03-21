@@ -131,13 +131,9 @@ def _make_execute_schema_mocks() -> tuple[MagicMock, AsyncMock]:
     ``pool.acquire()`` is a sync call that returns an async context
     manager yielding ``conn``.
     """
-    conn = AsyncMock()
-    pool = MagicMock()
-    ctx = AsyncMock()
-    ctx.__aenter__ = AsyncMock(return_value=conn)
-    ctx.__aexit__ = AsyncMock(return_value=False)
-    pool.acquire.return_value = ctx
-    return pool, conn
+    from bsgateway.tests.conftest import make_mock_pool
+
+    return make_mock_pool()
 
 
 @pytest.mark.asyncio

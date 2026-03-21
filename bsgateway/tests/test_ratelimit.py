@@ -116,12 +116,10 @@ class TestRateLimitAPI:
     """Integration tests for rate limiting in the chat endpoint."""
 
     @pytest.fixture
-    def mock_pool(self) -> AsyncMock:
-        pool = AsyncMock()
-        pool._closed = False
-        conn = AsyncMock()
-        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-        pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+    def mock_pool(self):
+        from bsgateway.tests.conftest import make_mock_pool
+
+        pool, _conn = make_mock_pool()
         return pool
 
     @pytest.fixture

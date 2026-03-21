@@ -74,12 +74,10 @@ def _make_tenant_config(
     )
 
 
-def _make_pool() -> AsyncMock:
-    pool = AsyncMock()
-    pool._closed = False
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+def _make_pool() -> MagicMock:
+    from bsgateway.tests.conftest import make_mock_pool
+
+    pool, _conn = make_mock_pool()
     return pool
 
 
@@ -476,10 +474,12 @@ class TestLogRequest:
 
     async def test_log_request_does_not_raise(self):
         """Logging errors should be swallowed, not propagate."""
+        from bsgateway.tests.conftest import MockAcquire
+
         pool = _make_pool()
         conn = AsyncMock()
         conn.execute = AsyncMock(side_effect=Exception("DB error"))
-        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        pool.acquire.return_value = MockAcquire(conn)
 
         svc = ChatService(pool, ENCRYPTION_KEY)
 

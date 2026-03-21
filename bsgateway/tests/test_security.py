@@ -85,7 +85,7 @@ class TestEncryption:
 
 
 class TestJWT:
-    JWT_SECRET = "test-secret-key-for-jwt-signing"
+    JWT_SECRET = "test-secret-key-for-jwt-signing!!"
 
     def test_create_and_decode(self):
         token = create_jwt("tenant-123", self.JWT_SECRET, scopes=["admin"])
@@ -103,7 +103,7 @@ class TestJWT:
 
         token = create_jwt("tenant-789", self.JWT_SECRET)
         with pytest.raises(jwt.InvalidSignatureError):
-            decode_jwt(token, "wrong-secret")
+            decode_jwt(token, "wrong-secret-that-is-long-enough!!")
 
     def test_expired_token_fails(self):
         import jwt

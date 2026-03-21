@@ -19,12 +19,10 @@ TENANT_ID = uuid4()
 
 
 @pytest.fixture
-def mock_pool() -> AsyncMock:
-    pool = AsyncMock()
-    pool._closed = False
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+def mock_pool():
+    from bsgateway.tests.conftest import make_mock_pool
+
+    pool, _conn = make_mock_pool()
     return pool
 
 
