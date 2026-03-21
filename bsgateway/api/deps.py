@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import asyncio
+import hmac
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import asyncpg
+import jwt as pyjwt
 import structlog
 from fastapi import Depends, HTTPException, Request, status
 
-from bsgateway.core.security import hash_api_key
+from bsgateway.core.cache import CacheManager
+from bsgateway.core.security import decode_jwt, hash_api_key
+
+if TYPE_CHECKING:
+    from bsgateway.audit.service import AuditService
 
 logger = structlog.get_logger(__name__)
+
+SUPERADMIN_UUID = UUID("00000000-0000-0000-0000-000000000000")
 
 
 def get_pool(request: Request) -> asyncpg.Pool:
@@ -21,6 +32,11 @@ def get_pool(request: Request) -> asyncpg.Pool:
 def get_encryption_key(request: Request) -> bytes:
     """Extract the encryption key from app state."""
     return request.app.state.encryption_key
+
+
+def get_cache(request: Request) -> CacheManager | None:
+    """Extract the cache manager from app state (optional)."""
+    return getattr(request.app.state, "cache", None)
 
 
 @dataclass
@@ -48,20 +64,35 @@ async def get_auth_context(request: Request) -> AuthContext:
     token = auth_header[7:]
     pool: asyncpg.Pool = request.app.state.db_pool
 
-    # Check superadmin key first (compare hashes, never plaintext)
+    # Try JWT first (issued by /auth/token for dashboard sessions)
+    jwt_secret = getattr(request.app.state, "jwt_secret", "")
+    if jwt_secret:
+        try:
+            payload = decode_jwt(token, jwt_secret)
+            logger.debug("auth_jwt_success", tenant_id=payload.tenant_id)
+            return AuthContext(
+                tenant_id=UUID(payload.tenant_id),
+                scopes=payload.scopes,
+                key_hash="",
+            )
+        except pyjwt.InvalidTokenError:
+            logger.debug("jwt_decode_failed", exc_info=True)
+
+    # Compute hash once (used for both superadmin check and DB lookup)
+    key_hash = hash_api_key(token)
+
+    # Check superadmin key (compare hashes, never plaintext)
     superadmin_hash = getattr(request.app.state, "superadmin_key_hash", "")
-    if superadmin_hash and hash_api_key(token) == superadmin_hash:
+    if superadmin_hash and hmac.compare_digest(key_hash, superadmin_hash):
         return AuthContext(
-            tenant_id=UUID("00000000-0000-0000-0000-000000000000"),
+            tenant_id=SUPERADMIN_UUID,
             scopes=["admin"],
             key_hash="",
         )
 
-    # Resolve tenant via API key
-    key_hash = hash_api_key(token)
-
     from bsgateway.tenant.repository import TenantRepository
 
+    # Note: Don't use cache in get_auth_context since we need fresh auth check
     repo = TenantRepository(pool)
     row = await repo.get_api_key_by_hash(key_hash)
 
@@ -83,11 +114,28 @@ async def get_auth_context(request: Request) -> AuthContext:
             detail="Access denied",
         )
 
-    # Touch last_used_at (fire-and-forget)
-    try:
-        await repo.touch_api_key(key_hash)
-    except Exception:
-        logger.warning("touch_api_key_failed", exc_info=True)
+    # Touch last_used_at (throttled, fire-and-forget — at most once per 60s per key)
+    if not hasattr(request.app.state, "_touch_last"):
+        request.app.state._touch_last = {}
+    _touch_last: dict[str, float] = request.app.state._touch_last
+    now = time.monotonic()
+    if now - _touch_last.get(key_hash, 0) >= 60:
+        _touch_last[key_hash] = now
+        if not hasattr(request.app.state, "background_tasks"):
+            request.app.state.background_tasks = set()
+        bg_tasks: set = request.app.state.background_tasks
+
+        def _on_touch_done(t: asyncio.Task) -> None:
+            bg_tasks.discard(t)
+            if not t.cancelled():
+                exc = t.exception()
+                if exc:
+                    exc_tuple = (type(exc), exc, exc.__traceback__)
+                    logger.warning("touch_api_key_failed", error=str(exc), exc_info=exc_tuple)
+
+        task = asyncio.create_task(asyncio.wait_for(repo.touch_api_key(key_hash), timeout=10.0))
+        bg_tasks.add(task)
+        task.add_done_callback(_on_touch_done)
 
     logger.info(
         "auth_success",
@@ -112,12 +160,26 @@ def require_admin(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
     return auth
 
 
+def get_audit_service(request: Request) -> AuditService:
+    """Create an AuditService instance from the request."""
+    from bsgateway.audit.repository import AuditRepository
+    from bsgateway.audit.service import AuditService
+
+    pool = request.app.state.db_pool
+    return AuditService(AuditRepository(pool))
+
+
 def require_tenant_access(
     tenant_id: UUID,
     auth: AuthContext = Depends(get_auth_context),
 ) -> AuthContext:
-    """Verify the authenticated tenant matches the requested tenant_id."""
-    if "admin" in auth.scopes:
+    """Verify the authenticated tenant matches the requested tenant_id.
+
+    Superadmin (UUID 00000000-...) may access any tenant.
+    All other callers must own the requested tenant_id.
+    """
+    # Superadmin access: check scopes (not just UUID) for defense-in-depth
+    if "admin" in auth.scopes and auth.tenant_id == SUPERADMIN_UUID:
         return auth
     if auth.tenant_id != tenant_id:
         raise HTTPException(

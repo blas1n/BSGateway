@@ -31,7 +31,11 @@ def routing_config() -> RoutingConfig:
             "opus": "claude-opus",
         },
         passthrough_models={
-            "local/llama3", "gpt-4o-mini", "gpt-4o", "claude-opus", "claude-sonnet",
+            "local/llama3",
+            "gpt-4o-mini",
+            "gpt-4o",
+            "claude-opus",
+            "claude-sonnet",
         },
         classifier=ClassifierConfig(
             weights=ClassifierWeights(),
@@ -56,18 +60,14 @@ class TestPassthrough:
             "model": "gpt-4o-mini",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["model"] == "gpt-4o-mini"
         assert result["metadata"]["routing_decision"]["method"] == "passthrough"
 
     @pytest.mark.asyncio
     async def test_non_completion_call_type_skipped(self, router: BSGatewayRouter) -> None:
         data = {"model": "auto", "messages": []}
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "embeddings"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "embeddings")
         assert result["model"] == "auto"  # Unchanged
 
 
@@ -78,9 +78,7 @@ class TestAliasResolution:
             "model": "local",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["model"] == "local/llama3"
         assert result["metadata"]["routing_decision"]["method"] == "alias"
 
@@ -90,9 +88,7 @@ class TestAliasResolution:
             "model": "fast",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["model"] == "gpt-4o-mini"
 
     @pytest.mark.asyncio
@@ -101,9 +97,7 @@ class TestAliasResolution:
             "model": "opus",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["model"] == "claude-opus"
 
 
@@ -114,9 +108,7 @@ class TestAutoRouting:
             "model": "auto",
             "messages": [{"role": "user", "content": "hello, what is Python?"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         decision = result["metadata"]["routing_decision"]
         assert decision["method"] == "auto"
         assert decision["tier"] == "simple"
@@ -127,16 +119,17 @@ class TestAutoRouting:
         data = {
             "model": "auto",
             "messages": [
-                {"role": "user", "content": (
-                    "Design a microservices architect for e-commerce. "
-                    "Optimize for performance and scalability. "
-                    "Refactor the existing monolith."
-                )}
+                {
+                    "role": "user",
+                    "content": (
+                        "Design a microservices architect for e-commerce. "
+                        "Optimize for performance and scalability. "
+                        "Refactor the existing monolith."
+                    ),
+                }
             ],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         decision = result["metadata"]["routing_decision"]
         assert decision["method"] == "auto"
         assert decision["tier"] == "complex"
@@ -148,9 +141,7 @@ class TestAutoRouting:
             "model": "unknown-model",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         decision = result["metadata"]["routing_decision"]
         assert decision["method"] == "auto"
 
@@ -160,9 +151,7 @@ class TestAutoRouting:
             "model": "auto",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["metadata"]["routing_decision"]["method"] == "auto"
 
 
@@ -174,9 +163,7 @@ class TestFallback:
             "model": "auto",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["model"] == "gpt-4o-mini"  # fallback tier is medium
         assert result["metadata"]["routing_decision"]["tier"] == "medium"
 
@@ -188,9 +175,7 @@ class TestRoutingMetadata:
             "model": "auto",
             "messages": [{"role": "user", "content": "hello"}],
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         decision = result["metadata"]["routing_decision"]
         assert "method" in decision
         assert "original_model" in decision
@@ -205,9 +190,7 @@ class TestRoutingMetadata:
             "messages": [{"role": "user", "content": "hello"}],
             "metadata": {"user_id": "test-user"},
         }
-        result = await router.async_pre_call_hook(
-            MagicMock(), MagicMock(), data, "completion"
-        )
+        result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
         assert result["metadata"]["user_id"] == "test-user"
         assert "routing_decision" in result["metadata"]
 
@@ -266,7 +249,8 @@ class TestAutoRoutePatterns:
 
     @pytest.mark.asyncio
     async def test_non_matching_model_still_auto_routes(
-        self, pattern_router: BSGatewayRouter,
+        self,
+        pattern_router: BSGatewayRouter,
     ) -> None:
         """Unknown models that don't match patterns should still auto-route."""
         data = {
@@ -280,7 +264,8 @@ class TestAutoRoutePatterns:
 
     @pytest.mark.asyncio
     async def test_passthrough_takes_priority_over_pattern(
-        self, pattern_router: BSGatewayRouter,
+        self,
+        pattern_router: BSGatewayRouter,
     ) -> None:
         """Passthrough models should not be intercepted by patterns."""
         data = {

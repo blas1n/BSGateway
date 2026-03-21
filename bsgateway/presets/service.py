@@ -19,7 +19,9 @@ class PresetService:
     """Apply preset templates to tenants."""
 
     def __init__(
-        self, rules_repo: RulesRepository, tenant_repo: TenantRepository,
+        self,
+        rules_repo: RulesRepository,
+        tenant_repo: TenantRepository,
     ) -> None:
         self._repo = rules_repo
         self._tenant_repo = tenant_repo
@@ -46,9 +48,7 @@ class PresetService:
         for rule_def in preset.rules:
             concrete = model_mapping.resolve(rule_def.target_level)
             if concrete not in registered_names:
-                raise ValueError(
-                    f"Model '{concrete}' is not registered for this tenant"
-                )
+                raise ValueError(f"Model '{concrete}' is not registered for this tenant")
 
         # Check idempotency: reject if intents from this preset already exist
         existing_intents = await self._repo.list_intents(tenant_id)
@@ -57,8 +57,7 @@ class PresetService:
         overlap = existing_names & preset_intent_names
         if overlap:
             raise ValueError(
-                f"Preset '{preset_name}' appears already applied: "
-                f"intents {overlap} already exist"
+                f"Preset '{preset_name}' appears already applied: intents {overlap} already exist"
             )
 
         intents_created = 0
@@ -72,24 +71,39 @@ class PresetService:
                 for intent_def in preset.intents:
                     intent_row = await conn.fetchrow(
                         self._repo._sql.query("insert_intent"),
-                        tenant_id, intent_def.name, intent_def.description, 0.7,
+                        tenant_id,
+                        intent_def.name,
+                        intent_def.description,
+                        0.7,
                     )
                     intents_created += 1
 
                     for example_text in intent_def.examples:
                         await conn.fetchrow(
                             self._repo._sql.query("insert_intent_example"),
-                            intent_row["id"], example_text, None,
+                            intent_row["id"],
+                            example_text,
+                            None,
                         )
                         examples_created += 1
 
+                # Get max existing priority to avoid UNIQUE constraint violations
+                max_priority_row = await conn.fetchval(
+                    "SELECT COALESCE(MAX(priority), -1) FROM routing_rules WHERE tenant_id = $1",
+                    tenant_id,
+                )
+                base_priority = max_priority_row + 1
+
                 # Create rules with concrete model names
-                for priority, rule_def in enumerate(preset.rules):
+                for offset, rule_def in enumerate(preset.rules):
                     concrete_model = model_mapping.resolve(rule_def.target_level)
 
                     rule_row = await conn.fetchrow(
                         self._repo._sql.query("insert_rule"),
-                        tenant_id, rule_def.name, priority, rule_def.is_default,
+                        tenant_id,
+                        rule_def.name,
+                        base_priority + offset,
+                        rule_def.is_default,
                         concrete_model,
                     )
                     rules_created += 1
@@ -99,8 +113,12 @@ class PresetService:
                         for c in rule_def.conditions:
                             await conn.fetchrow(
                                 self._repo._sql.query("insert_condition"),
-                                rule_row["id"], c.condition_type, c.operator,
-                                c.field, json.dumps(c.value), False,
+                                rule_row["id"],
+                                c.condition_type,
+                                c.operator,
+                                c.field,
+                                json.dumps(c.value),
+                                False,
                             )
 
         logger.info(

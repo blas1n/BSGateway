@@ -8,6 +8,7 @@ from uuid import UUID
 import asyncpg
 import structlog
 
+from bsgateway.core.cache import CACHE_TTL_RULES, CacheManager, cache_key_rules
 from bsgateway.core.exceptions import DuplicateError
 
 logger = structlog.get_logger(__name__)
@@ -48,11 +49,12 @@ sql = RulesSqlLoader()
 
 
 class RulesRepository:
-    """Database access for routing rules, conditions, and intents."""
+    """Database access for routing rules, conditions, and intents with caching."""
 
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, cache: CacheManager | None = None) -> None:
         self._pool = pool
         self._sql = sql
+        self._cache = cache
 
     async def init_schema(self) -> None:
         schema = sql.schema()
@@ -75,26 +77,54 @@ class RulesRepository:
     ) -> asyncpg.Record:
         async with self._pool.acquire() as conn:
             try:
-                return await conn.fetchrow(
+                row = await conn.fetchrow(
                     sql.query("insert_rule"),
-                    tenant_id, name, priority, is_default, target_model,
+                    tenant_id,
+                    name,
+                    priority,
+                    is_default,
+                    target_model,
                 )
             except asyncpg.UniqueViolationError as e:
-                raise DuplicateError(
-                    "Rule with this name or priority already exists"
-                ) from e
+                raise DuplicateError("Rule with this name or priority already exists") from e
+
+        # Invalidate cache
+        if self._cache:
+            key = cache_key_rules(str(tenant_id))
+            await self._cache.delete(key)
+
+        return row
 
     async def get_rule(
-        self, rule_id: UUID, tenant_id: UUID,
+        self,
+        rule_id: UUID,
+        tenant_id: UUID,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
-                sql.query("get_rule"), rule_id, tenant_id,
+                sql.query("get_rule"),
+                rule_id,
+                tenant_id,
             )
 
     async def list_rules(self, tenant_id: UUID) -> list[asyncpg.Record]:
+        # Try cache first
+        if self._cache:
+            key = cache_key_rules(str(tenant_id))
+            cached = await self._cache.get(key)
+            if cached is not None:
+                return [dict(row) for row in cached]
+
+        # Fetch from DB
         async with self._pool.acquire() as conn:
-            return await conn.fetch(sql.query("list_rules"), tenant_id)
+            rows = await conn.fetch(sql.query("list_rules"), tenant_id)
+
+        # Cache result
+        if self._cache and rows:
+            key = cache_key_rules(str(tenant_id))
+            await self._cache.set(key, [dict(row) for row in rows], CACHE_TTL_RULES)
+
+        return rows
 
     async def update_rule(
         self,
@@ -106,17 +136,36 @@ class RulesRepository:
         target_model: str,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
-            return await conn.fetchrow(
+            row = await conn.fetchrow(
                 sql.query("update_rule"),
-                rule_id, tenant_id, name, priority, is_default, target_model,
+                rule_id,
+                tenant_id,
+                name,
+                priority,
+                is_default,
+                target_model,
             )
+
+        # Invalidate cache
+        if self._cache:
+            key = cache_key_rules(str(tenant_id))
+            await self._cache.delete(key)
+
+        return row
 
     async def delete_rule(self, rule_id: UUID, tenant_id: UUID) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(sql.query("delete_rule"), rule_id, tenant_id)
 
+        # Invalidate cache
+        if self._cache:
+            key = cache_key_rules(str(tenant_id))
+            await self._cache.delete(key)
+
     async def reorder_rules(
-        self, tenant_id: UUID, priorities: dict[UUID, int],
+        self,
+        tenant_id: UUID,
+        priorities: dict[UUID, int],
     ) -> None:
         async with self._pool.acquire() as conn:
             async with conn.transaction():
@@ -125,8 +174,15 @@ class RulesRepository:
                 for rule_id, priority in priorities.items():
                     await conn.execute(
                         sql.query("update_rule_priority"),
-                        rule_id, tenant_id, priority,
+                        rule_id,
+                        tenant_id,
+                        priority,
                     )
+
+        # Invalidate cache
+        if self._cache:
+            key = cache_key_rules(str(tenant_id))
+            await self._cache.delete(key)
 
     # -- Conditions --
 
@@ -142,8 +198,12 @@ class RulesRepository:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
                 sql.query("insert_condition"),
-                rule_id, condition_type, operator, field,
-                json.dumps(value), negate,
+                rule_id,
+                condition_type,
+                operator,
+                field,
+                json.dumps(value),
+                negate,
             )
 
     async def list_conditions(self, rule_id: UUID) -> list[asyncpg.Record]:
@@ -159,7 +219,8 @@ class RulesRepository:
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(
-                    sql.query("delete_conditions_for_rule"), rule_id,
+                    sql.query("delete_conditions_for_rule"),
+                    rule_id,
                 )
                 results = []
                 for c in conditions:
@@ -176,11 +237,13 @@ class RulesRepository:
                 return results
 
     async def list_conditions_for_tenant(
-        self, tenant_id: UUID,
+        self,
+        tenant_id: UUID,
     ) -> list[asyncpg.Record]:
         async with self._pool.acquire() as conn:
             return await conn.fetch(
-                sql.query("list_conditions_for_tenant"), tenant_id,
+                sql.query("list_conditions_for_tenant"),
+                tenant_id,
             )
 
     # -- Intents --
@@ -195,15 +258,22 @@ class RulesRepository:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
                 sql.query("insert_intent"),
-                tenant_id, name, description, threshold,
+                tenant_id,
+                name,
+                description,
+                threshold,
             )
 
     async def get_intent(
-        self, intent_id: UUID, tenant_id: UUID,
+        self,
+        intent_id: UUID,
+        tenant_id: UUID,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
-                sql.query("get_intent"), intent_id, tenant_id,
+                sql.query("get_intent"),
+                intent_id,
+                tenant_id,
             )
 
     async def list_intents(self, tenant_id: UUID) -> list[asyncpg.Record]:
@@ -221,15 +291,23 @@ class RulesRepository:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
                 sql.query("update_intent"),
-                intent_id, tenant_id, name, description, threshold,
+                intent_id,
+                tenant_id,
+                name,
+                description,
+                threshold,
             )
 
     async def delete_intent(
-        self, intent_id: UUID, tenant_id: UUID,
+        self,
+        intent_id: UUID,
+        tenant_id: UUID,
     ) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(
-                sql.query("delete_intent"), intent_id, tenant_id,
+                sql.query("delete_intent"),
+                intent_id,
+                tenant_id,
             )
 
     # -- Intent Examples --
@@ -243,29 +321,39 @@ class RulesRepository:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
                 sql.query("insert_intent_example"),
-                intent_id, text, embedding,
+                intent_id,
+                text,
+                embedding,
             )
 
     async def list_examples(
-        self, intent_id: UUID,
+        self,
+        intent_id: UUID,
     ) -> list[asyncpg.Record]:
         async with self._pool.acquire() as conn:
             return await conn.fetch(
-                sql.query("list_intent_examples"), intent_id,
+                sql.query("list_intent_examples"),
+                intent_id,
             )
 
     async def delete_example(
-        self, example_id: UUID, intent_id: UUID,
+        self,
+        example_id: UUID,
+        intent_id: UUID,
     ) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(
-                sql.query("delete_intent_example"), example_id, intent_id,
+                sql.query("delete_intent_example"),
+                example_id,
+                intent_id,
             )
 
     async def list_examples_for_tenant(
-        self, tenant_id: UUID,
+        self,
+        tenant_id: UUID,
     ) -> list[asyncpg.Record]:
         async with self._pool.acquire() as conn:
             return await conn.fetch(
-                sql.query("list_intent_examples_for_tenant"), tenant_id,
+                sql.query("list_intent_examples_for_tenant"),
+                tenant_id,
             )

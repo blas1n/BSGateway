@@ -23,7 +23,17 @@ class PresetApplyResponse(BaseModel):
 class FeedbackCreate(BaseModel):
     routing_id: str = Field(..., min_length=1)
     rating: int = Field(..., ge=1, le=5)
-    comment: str = ""
+    comment: str = Field(default="", max_length=2000)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "routing_id": "550e8400-e29b-41d4-a716-446655440000",
+                "rating": 5,
+                "comment": "Correct model selected",
+            },
+        },
+    }
 
 
 class FeedbackResponse(BaseModel):

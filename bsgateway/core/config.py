@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
+import structlog
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_config_logger = structlog.get_logger(__name__)
 
 
 class Settings(BaseSettings):
@@ -27,30 +29,36 @@ class Settings(BaseSettings):
     # Superadmin bootstrap key (for creating first tenant)
     superadmin_key: str = ""
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    # CORS (comma-separated list of allowed origins, e.g. "http://localhost:5173,https://app.example.com")
+    cors_allowed_origins: str = ""
+
+    # Frontend dist directory (for serving dashboard static files)
+    frontend_dist_dir: str = ""
+
+    # Development seed data (creates test tenant + API key on startup)
+    seed_dev_data: bool = False
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
     def encryption_key_bytes(self) -> bytes:
-        """Return the encryption key as raw bytes."""
+        """Return the encryption key as raw bytes.
+
+        Raises RuntimeError if ENCRYPTION_KEY is not set — provider API keys
+        require encryption and must not be stored in plaintext.
+        """
         if not self.encryption_key:
-            warnings.warn(
-                "ENCRYPTION_KEY is not set; provider API keys will not be encrypted",
-                stacklevel=2,
+            raise RuntimeError(
+                "ENCRYPTION_KEY is required — provider API keys cannot be "
+                "stored without encryption. Generate one with: "
+                'python -c "import os; print(os.urandom(32).hex())"'
             )
-            return b""
         try:
             key = bytes.fromhex(self.encryption_key)
         except ValueError as e:
-            raise ValueError(
-                "ENCRYPTION_KEY must be a valid hex string"
-                f" (got {len(self.encryption_key)} chars): {e}"
-            ) from e
+            raise ValueError("ENCRYPTION_KEY must be a valid 64-character hex string") from e
         if len(key) != 32:
-            raise ValueError(
-                f"ENCRYPTION_KEY must be 32 bytes (64 hex chars), got {len(key)} bytes"
-            )
+            raise ValueError("ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)")
         return key
 
 

@@ -222,9 +222,7 @@ class TestEmbedding:
 
         with patch("bsgateway.routing.collector.litellm") as mock_litellm:
             mock_litellm.aembedding = AsyncMock(return_value=fake_response)
-            await collector_with_embedding.record(
-                sample_data, sample_result, sample_decision
-            )
+            await collector_with_embedding.record(sample_data, sample_result, sample_decision)
 
         call_args = mock_pool.conn.execute.call_args[0]
         embedding_blob = call_args[14]
@@ -243,12 +241,8 @@ class TestEmbedding:
         sample_decision: RoutingDecision,
     ) -> None:
         with patch("bsgateway.routing.collector.litellm") as mock_litellm:
-            mock_litellm.aembedding = AsyncMock(
-                side_effect=ConnectionError("cannot connect")
-            )
-            await collector_with_embedding.record(
-                sample_data, sample_result, sample_decision
-            )
+            mock_litellm.aembedding = AsyncMock(side_effect=ConnectionError("cannot connect"))
+            await collector_with_embedding.record(sample_data, sample_result, sample_decision)
 
         mock_pool.conn.execute.assert_called_once()
         call_args = mock_pool.conn.execute.call_args[0]
@@ -265,9 +259,7 @@ class TestEmbedding:
         data = {"messages": [], "system": ""}
 
         with patch("bsgateway.routing.collector.litellm") as mock_litellm:
-            await collector_with_embedding.record(
-                data, sample_result, sample_decision
-            )
+            await collector_with_embedding.record(data, sample_result, sample_decision)
             mock_litellm.aembedding.assert_not_called()
 
         call_args = mock_pool.conn.execute.call_args[0]

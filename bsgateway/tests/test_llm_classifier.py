@@ -29,9 +29,7 @@ def fallback() -> FakeStaticClassifier:
 
 
 @pytest.fixture
-def classifier(
-    llm_config: LLMClassifierConfig, fallback: FakeStaticClassifier
-) -> LLMClassifier:
+def classifier(llm_config: LLMClassifierConfig, fallback: FakeStaticClassifier) -> LLMClassifier:
     return LLMClassifier(llm_config, fallback=fallback)
 
 
@@ -47,9 +45,7 @@ class TestLLMClassification:
     async def test_simple_classification(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
             mock_litellm.acompletion = AsyncMock(return_value=_mock_response("simple"))
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "hello"}]}
-            )
+            result = await classifier.classify({"messages": [{"role": "user", "content": "hello"}]})
         assert result.tier == "simple"
         assert result.strategy == "llm"
 
@@ -81,33 +77,23 @@ class TestLLMResponseParsing:
             mock_litellm.acompletion = AsyncMock(
                 return_value=_mock_response("I think this is complex.")
             )
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "test"}]}
-            )
+            result = await classifier.classify({"messages": [{"role": "user", "content": "test"}]})
         assert result.tier == "complex"
 
     @pytest.mark.asyncio
-    async def test_invalid_response_defaults_to_medium(
-        self, classifier: LLMClassifier
-    ) -> None:
+    async def test_invalid_response_defaults_to_medium(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
             mock_litellm.acompletion = AsyncMock(
                 return_value=_mock_response("I cannot classify this.")
             )
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "test"}]}
-            )
+            result = await classifier.classify({"messages": [{"role": "user", "content": "test"}]})
         assert result.tier == "medium"
 
     @pytest.mark.asyncio
     async def test_case_insensitive_parsing(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
-            mock_litellm.acompletion = AsyncMock(
-                return_value=_mock_response("SIMPLE")
-            )
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "test"}]}
-            )
+            mock_litellm.acompletion = AsyncMock(return_value=_mock_response("SIMPLE"))
+            result = await classifier.classify({"messages": [{"role": "user", "content": "test"}]})
         assert result.tier == "simple"
 
 
@@ -116,9 +102,7 @@ class TestLLMFallback:
     async def test_timeout_falls_back_to_static(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
             mock_litellm.acompletion = AsyncMock(side_effect=TimeoutError("timeout"))
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "hello"}]}
-            )
+            result = await classifier.classify({"messages": [{"role": "user", "content": "hello"}]})
         assert result.strategy == "static"
         assert result.tier == "medium"
         assert result.score == 50
@@ -126,23 +110,15 @@ class TestLLMFallback:
     @pytest.mark.asyncio
     async def test_connection_error_falls_back(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
-            mock_litellm.acompletion = AsyncMock(
-                side_effect=ConnectionError("cannot connect")
-            )
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "hello"}]}
-            )
+            mock_litellm.acompletion = AsyncMock(side_effect=ConnectionError("cannot connect"))
+            result = await classifier.classify({"messages": [{"role": "user", "content": "hello"}]})
         assert result.strategy == "static"
 
     @pytest.mark.asyncio
     async def test_generic_error_falls_back(self, classifier: LLMClassifier) -> None:
         with patch("bsgateway.routing.classifiers.llm.litellm") as mock_litellm:
-            mock_litellm.acompletion = AsyncMock(
-                side_effect=RuntimeError("unexpected error")
-            )
-            result = await classifier.classify(
-                {"messages": [{"role": "user", "content": "hello"}]}
-            )
+            mock_litellm.acompletion = AsyncMock(side_effect=RuntimeError("unexpected error"))
+            result = await classifier.classify({"messages": [{"role": "user", "content": "hello"}]})
         assert result.strategy == "static"
 
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from json import JSONDecodeError
 from uuid import UUID
 
 import asyncpg
@@ -13,6 +11,7 @@ from bsgateway.core.security import (
     generate_api_key,
     hash_api_key,
 )
+from bsgateway.core.utils import safe_json_loads
 from bsgateway.tenant.models import (
     ApiKeyCreatedResponse,
     ApiKeyResponse,
@@ -26,21 +25,8 @@ from bsgateway.tenant.repository import TenantRepository
 logger = structlog.get_logger(__name__)
 
 
-def _safe_json_loads(raw: str | dict | None, fallback: dict | None = None) -> dict:
-    """Safely parse JSON string, returning fallback on error."""
-    if raw is None:
-        return fallback or {}
-    if isinstance(raw, dict):
-        return raw
-    try:
-        return json.loads(raw)
-    except (JSONDecodeError, TypeError):
-        logger.warning("json_parse_failed", raw_type=type(raw).__name__)
-        return fallback or {}
-
-
 def _record_to_tenant(row: asyncpg.Record) -> TenantResponse:
-    settings = _safe_json_loads(row["settings"])
+    settings = safe_json_loads(row["settings"])
     return TenantResponse(
         id=row["id"],
         name=row["name"],
@@ -53,7 +39,7 @@ def _record_to_tenant(row: asyncpg.Record) -> TenantResponse:
 
 
 def _record_to_model(row: asyncpg.Record) -> TenantModelResponse:
-    extra_params = _safe_json_loads(row["extra_params"])
+    extra_params = safe_json_loads(row["extra_params"])
     return TenantModelResponse(
         id=row["id"],
         tenant_id=row["tenant_id"],
@@ -78,7 +64,10 @@ class TenantService:
     # -- Tenants --
 
     async def create_tenant(
-        self, name: str, slug: str, settings: dict | None = None,
+        self,
+        name: str,
+        slug: str,
+        settings: dict | None = None,
     ) -> TenantResponse:
         row = await self._repo.create_tenant(name, slug, settings)
         logger.info("tenant_created", tenant_id=str(row["id"]), slug=slug)
@@ -93,7 +82,11 @@ class TenantService:
         return [_record_to_tenant(r) for r in rows]
 
     async def update_tenant(
-        self, tenant_id: UUID, name: str, slug: str, settings: dict,
+        self,
+        tenant_id: UUID,
+        name: str,
+        slug: str,
+        settings: dict,
     ) -> TenantResponse | None:
         row = await self._repo.update_tenant(tenant_id, name, slug, settings)
         if row:
@@ -107,7 +100,10 @@ class TenantService:
     # -- API Keys --
 
     async def create_api_key(
-        self, tenant_id: UUID, name: str = "", scopes: list[str] | None = None,
+        self,
+        tenant_id: UUID,
+        name: str = "",
+        scopes: list[str] | None = None,
     ) -> ApiKeyCreatedResponse:
         plaintext_key, prefix = generate_api_key()
         key_hash = hash_api_key(plaintext_key)
@@ -147,20 +143,23 @@ class TenantService:
     # -- Tenant Models --
 
     async def create_model(
-        self, tenant_id: UUID, data: TenantModelCreate,
+        self,
+        tenant_id: UUID,
+        data: TenantModelCreate,
     ) -> TenantModelResponse:
         encrypted_key = None
         if data.api_key and self._encryption_key:
             encrypted_key = encrypt_value(data.api_key, self._encryption_key)
         elif data.api_key:
-            raise ValueError(
-                "ENCRYPTION_KEY is required to store provider API keys"
-            )
+            logger.warning("encryption_key_missing", tenant_id=str(tenant_id))
+            raise ValueError("Unable to store API keys securely — encryption is not configured")
+
+        provider = data.litellm_model.split("/")[0] if "/" in data.litellm_model else "unknown"
 
         row = await self._repo.create_model(
             tenant_id=tenant_id,
             model_name=data.model_name,
-            provider=data.provider,
+            provider=provider,
             litellm_model=data.litellm_model,
             api_key_encrypted=encrypted_key,
             api_base=data.api_base,
@@ -190,19 +189,21 @@ class TenantService:
         encrypted_key = existing["api_key_encrypted"]
         if data.api_key is not None:
             if not self._encryption_key:
-                raise ValueError(
-                    "ENCRYPTION_KEY is required to store provider API keys"
-                )
+                logger.warning("encryption_key_missing", model_id=str(model_id))
+                raise ValueError("Unable to store API keys securely — encryption is not configured")
             encrypted_key = encrypt_value(data.api_key, self._encryption_key)
 
-        existing_extra = _safe_json_loads(existing["extra_params"])
+        existing_extra = safe_json_loads(existing["extra_params"])
+
+        new_litellm_model = data.litellm_model or existing["litellm_model"]
+        new_provider = new_litellm_model.split("/")[0] if "/" in new_litellm_model else "unknown"
 
         row = await self._repo.update_model(
             model_id=model_id,
             tenant_id=tenant_id,
             model_name=data.model_name or existing["model_name"],
-            provider=data.provider or existing["provider"],
-            litellm_model=data.litellm_model or existing["litellm_model"],
+            provider=new_provider,
+            litellm_model=new_litellm_model,
             api_key_encrypted=encrypted_key,
             api_base=data.api_base if data.api_base is not None else existing["api_base"],
             extra_params=data.extra_params if data.extra_params is not None else existing_extra,

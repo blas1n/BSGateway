@@ -2,6 +2,7 @@
 
 Uses mocked repository to test business logic without a real database.
 """
+
 from __future__ import annotations
 
 import json
@@ -157,7 +158,10 @@ class TestApiKeys:
 
 class TestTenantModels:
     async def test_create_model_with_api_key(
-        self, service: TenantService, mock_repo: AsyncMock, encryption_key: bytes,
+        self,
+        service: TenantService,
+        mock_repo: AsyncMock,
+        encryption_key: bytes,
     ):
         tid = uuid4()
         record = _make_model_record(tenant_id=tid, api_key_encrypted="encrypted_value")
@@ -178,7 +182,9 @@ class TestTenantModels:
         assert call_kwargs.kwargs["api_key_encrypted"] != "sk-test-key"
 
     async def test_create_model_without_api_key(
-        self, service: TenantService, mock_repo: AsyncMock,
+        self,
+        service: TenantService,
+        mock_repo: AsyncMock,
     ):
         tid = uuid4()
         record = _make_model_record(tenant_id=tid)
@@ -197,13 +203,18 @@ class TestTenantModels:
         assert call_kwargs.kwargs["api_key_encrypted"] is None
 
     async def test_get_model_api_key_decrypts(
-        self, service: TenantService, mock_repo: AsyncMock, encryption_key: bytes,
+        self,
+        service: TenantService,
+        mock_repo: AsyncMock,
+        encryption_key: bytes,
     ):
         tid = uuid4()
         mid = uuid4()
         encrypted = encrypt_value("sk-real-key", encryption_key)
         record = _make_model_record(
-            tenant_id=tid, model_id=mid, api_key_encrypted=encrypted,
+            tenant_id=tid,
+            model_id=mid,
+            api_key_encrypted=encrypted,
         )
         mock_repo.get_model.return_value = record
 
@@ -211,7 +222,9 @@ class TestTenantModels:
         assert result == "sk-real-key"
 
     async def test_get_model_api_key_none_when_no_key(
-        self, service: TenantService, mock_repo: AsyncMock,
+        self,
+        service: TenantService,
+        mock_repo: AsyncMock,
     ):
         record = _make_model_record(api_key_encrypted=None)
         mock_repo.get_model.return_value = record
@@ -220,7 +233,9 @@ class TestTenantModels:
         assert result is None
 
     async def test_update_model(
-        self, service: TenantService, mock_repo: AsyncMock,
+        self,
+        service: TenantService,
+        mock_repo: AsyncMock,
     ):
         tid = uuid4()
         mid = uuid4()
@@ -237,7 +252,8 @@ class TestTenantModels:
         assert result.model_name == "gpt-4o-updated"
 
     async def test_create_model_no_encryption_key_rejects(
-        self, mock_repo: AsyncMock,
+        self,
+        mock_repo: AsyncMock,
     ):
         """Providing api_key without ENCRYPTION_KEY must raise ValueError."""
         svc_no_key = TenantService(mock_repo, encryption_key=b"")
@@ -247,11 +263,12 @@ class TestTenantModels:
             litellm_model="openai/gpt-4o",
             api_key="sk-plaintext",
         )
-        with pytest.raises(ValueError, match="ENCRYPTION_KEY is required"):
+        with pytest.raises(ValueError, match="Unable to store API keys securely"):
             await svc_no_key.create_model(uuid4(), data)
 
     async def test_update_model_no_encryption_key_rejects(
-        self, mock_repo: AsyncMock,
+        self,
+        mock_repo: AsyncMock,
     ):
         """Updating api_key without ENCRYPTION_KEY must raise ValueError."""
         svc_no_key = TenantService(mock_repo, encryption_key=b"")
@@ -261,7 +278,7 @@ class TestTenantModels:
         mock_repo.get_model.return_value = existing
 
         data = TenantModelUpdate(api_key="sk-new-plaintext")
-        with pytest.raises(ValueError, match="ENCRYPTION_KEY is required"):
+        with pytest.raises(ValueError, match="Unable to store API keys securely"):
             await svc_no_key.update_model(mid, tid, data)
 
     async def test_delete_model(self, service: TenantService, mock_repo: AsyncMock):

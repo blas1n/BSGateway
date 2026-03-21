@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_admin
+from bsgateway.api.deps import (
+    AuthContext,
+    get_audit_service,
+    get_cache,
+    get_pool,
+    require_tenant_access,
+)
 from bsgateway.core.exceptions import DuplicateError
+from bsgateway.core.utils import parse_jsonb_value
 from bsgateway.rules.engine import RuleEngine
 from bsgateway.rules.models import (
     EvaluationContext,
@@ -32,19 +38,16 @@ router = APIRouter(prefix="/tenants/{tenant_id}/rules", tags=["rules"])
 
 
 def _get_repo(request: Request) -> RulesRepository:
-    return RulesRepository(get_pool(request))
+    return RulesRepository(get_pool(request), cache=get_cache(request))
 
 
 async def _validate_target_model(
     request: Request,
     tenant_id: UUID,
     target_model: str,
-    is_default: bool,
 ) -> None:
-    """Validate that target_model is registered for the tenant (skip for default rules)."""
-    if is_default:
-        return
-    tenant_repo = TenantRepository(get_pool(request))
+    """Validate that target_model is registered for the tenant."""
+    tenant_repo = TenantRepository(get_pool(request), cache=get_cache(request))
     model = await tenant_repo.get_model_by_name(tenant_id, target_model)
     if not model:
         raise HTTPException(
@@ -53,22 +56,12 @@ async def _validate_target_model(
         )
 
 
-def _parse_value(raw):
-    """Parse JSONB value from DB record."""
-    if isinstance(raw, str):
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            return raw
-    return raw
-
-
 async def _build_rule_response(
     repo: RulesRepository,
     row: asyncpg.Record,
     tenant_id: UUID,
 ) -> RuleResponse:
-    """Build a single rule response (fetches conditions individually)."""
+    """Build a single rule response (fetches conditions for this rule only)."""
     conditions = await repo.list_conditions(row["id"])
     return _row_to_rule_response(row, conditions)
 
@@ -92,7 +85,7 @@ def _row_to_rule_response(
                 condition_type=c["condition_type"],
                 field=c["field"],
                 operator=c["operator"],
-                value=_parse_value(c["value"]),
+                value=parse_jsonb_value(c["value"]),
                 negate=c["negate"],
             )
             for c in conditions
@@ -120,14 +113,21 @@ async def _build_rule_responses_batch(
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=RuleResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=RuleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create routing rule",
+)
 async def create_rule(
     tenant_id: UUID,
     body: RuleCreate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    # Intentionally uses require_tenant_access (not require_admin) so that
+    # tenant members can manage their own rules without superadmin privilege.
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
-    await _validate_target_model(request, tenant_id, body.target_model, body.is_default)
+    await _validate_target_model(request, tenant_id, body.target_model)
     repo = _get_repo(request)
     try:
         row = await repo.create_rule(
@@ -146,15 +146,25 @@ async def create_rule(
             [c.model_dump() for c in body.conditions],
         )
 
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id,
+        str(_auth.tenant_id),
+        "rule.created",
+        "rule",
+        str(row["id"]),
+        {"name": body.name, "target_model": body.target_model},
+    )
+
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT, summary="Reorder rules")
 async def reorder_rules(
     tenant_id: UUID,
     body: ReorderRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     await repo.reorder_rules(tenant_id, body.priorities)
@@ -165,12 +175,12 @@ async def reorder_rules(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/test", response_model=RuleTestResponse)
+@router.post("/test", response_model=RuleTestResponse, summary="Test rule matching")
 async def test_rules(
     tenant_id: UUID,
     body: RuleTestRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleTestResponse:
     """Test which rule would match for a given request."""
     repo = _get_repo(request)
@@ -189,7 +199,7 @@ async def test_rules(
                 condition_type=c["condition_type"],
                 field=c["field"],
                 operator=c["operator"],
-                value=_parse_value(c["value"]),
+                value=parse_jsonb_value(c["value"]),
                 negate=c["negate"],
             )
             for c in cond_by_rule.get(r["id"], [])
@@ -217,11 +227,7 @@ async def test_rules(
     data = {"messages": body.messages, "model": body.model}
 
     # Check if any rule uses intent conditions
-    has_intent_conditions = any(
-        c.condition_type == "intent"
-        for r in rules
-        for c in r.conditions
-    )
+    has_intent_conditions = any(c.condition_type == "intent" for r in rules for c in r.conditions)
 
     engine = RuleEngine()
     match = await engine.evaluate(data, tenant_config)
@@ -248,8 +254,7 @@ async def test_rules(
         ),
         target_model=match.target_model if match else None,
         evaluation_trace=(
-            (match.trace or [])
-            + ([{"warning": intent_warning}] if intent_warning else [])
+            (match.trace or []) + ([{"warning": intent_warning}] if intent_warning else [])
             if match
             else ([{"warning": intent_warning}] if intent_warning else [])
         ),
@@ -270,23 +275,23 @@ async def test_rules(
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=list[RuleResponse])
+@router.get("", response_model=list[RuleResponse], summary="List rules")
 async def list_rules(
     tenant_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> list[RuleResponse]:
     repo = _get_repo(request)
     rows = await repo.list_rules(tenant_id)
     return await _build_rule_responses_batch(repo, rows, tenant_id)
 
 
-@router.get("/{rule_id}", response_model=RuleResponse)
+@router.get("/{rule_id}", response_model=RuleResponse, summary="Get rule")
 async def get_rule(
     tenant_id: UUID,
     rule_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
     repo = _get_repo(request)
     row = await repo.get_rule(rule_id, tenant_id)
@@ -295,13 +300,13 @@ async def get_rule(
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.patch("/{rule_id}", response_model=RuleResponse)
+@router.patch("/{rule_id}", response_model=RuleResponse, summary="Update rule")
 async def update_rule(
     tenant_id: UUID,
     rule_id: UUID,
     body: RuleUpdate,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> RuleResponse:
     repo = _get_repo(request)
     existing = await repo.get_rule(rule_id, tenant_id)
@@ -309,19 +314,14 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="Rule not found")
 
     final_target = body.target_model or existing["target_model"]
-    final_is_default = (
-        body.is_default if body.is_default is not None else existing["is_default"]
-    )
-    await _validate_target_model(request, tenant_id, final_target, final_is_default)
+    await _validate_target_model(request, tenant_id, final_target)
 
     row = await repo.update_rule(
         rule_id=rule_id,
         tenant_id=tenant_id,
         name=body.name or existing["name"],
         priority=body.priority if body.priority is not None else existing["priority"],
-        is_default=(
-            body.is_default if body.is_default is not None else existing["is_default"]
-        ),
+        is_default=(body.is_default if body.is_default is not None else existing["is_default"]),
         target_model=body.target_model or existing["target_model"],
     )
     if not row:
@@ -336,12 +336,20 @@ async def update_rule(
     return await _build_rule_response(repo, row, tenant_id)
 
 
-@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete rule")
 async def delete_rule(
     tenant_id: UUID,
     rule_id: UUID,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> None:
     repo = _get_repo(request)
     await repo.delete_rule(rule_id, tenant_id)
+    audit = get_audit_service(request)
+    await audit.record(
+        tenant_id,
+        str(_auth.tenant_id),
+        "rule.deleted",
+        "rule",
+        str(rule_id),
+    )

@@ -4,7 +4,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bsgateway.api.deps import AuthContext, get_pool, require_admin
+from bsgateway.api.deps import (
+    AuthContext,
+    get_cache,
+    get_pool,
+    require_admin,
+    require_tenant_access,
+)
 from bsgateway.presets.models import PresetApplyRequest
 from bsgateway.presets.registry import PresetRegistry
 from bsgateway.presets.schemas import PresetApplyResponse, PresetSummary
@@ -17,7 +23,7 @@ router = APIRouter(tags=["presets"])
 _registry = PresetRegistry()
 
 
-@router.get("/presets", response_model=list[PresetSummary])
+@router.get("/presets", response_model=list[PresetSummary], summary="List presets")
 async def list_presets(
     _auth: AuthContext = Depends(require_admin),
 ) -> list[PresetSummary]:
@@ -37,16 +43,18 @@ async def list_presets(
     "/tenants/{tenant_id}/presets/apply",
     response_model=PresetApplyResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Apply preset",
 )
 async def apply_preset(
     tenant_id: UUID,
     body: PresetApplyRequest,
     request: Request,
-    _auth: AuthContext = Depends(require_admin),
+    _auth: AuthContext = Depends(require_tenant_access),
 ) -> PresetApplyResponse:
     """Apply a preset template to a tenant."""
     pool = get_pool(request)
-    rules_repo = RulesRepository(pool)
+    cache = get_cache(request)
+    rules_repo = RulesRepository(pool, cache=cache)
     tenant_repo = TenantRepository(pool)
     service = PresetService(rules_repo, tenant_repo)
 
@@ -56,8 +64,14 @@ async def apply_preset(
             preset_name=body.preset_name,
             model_mapping=body.model_mapping,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid preset or configuration") from None
+
+    # Invalidate rules cache after successful preset application
+    if cache:
+        from bsgateway.core.cache import cache_key_rules
+
+        await cache.delete(cache_key_rules(str(tenant_id)))
 
     return PresetApplyResponse(
         preset_name=result.preset_name,

@@ -7,6 +7,15 @@ from uuid import UUID
 import asyncpg
 import structlog
 
+from bsgateway.core.cache import (
+    CACHE_TTL_API_KEYS,
+    CACHE_TTL_MODELS,
+    CACHE_TTL_TENANTS,
+    CacheManager,
+    cache_key_api_keys,
+    cache_key_models,
+    cache_key_tenants,
+)
 from bsgateway.core.exceptions import DuplicateError
 
 logger = structlog.get_logger(__name__)
@@ -47,10 +56,11 @@ sql = TenantSqlLoader()
 
 
 class TenantRepository:
-    """Database access for tenants, API keys, and tenant models."""
+    """Database access for tenants, API keys, and tenant models with caching."""
 
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, cache: CacheManager | None = None) -> None:
         self._pool = pool
+        self._cache = cache
 
     async def init_schema(self) -> None:
         schema = sql.schema()
@@ -64,18 +74,29 @@ class TenantRepository:
     # -- Tenants --
 
     async def create_tenant(
-        self, name: str, slug: str, settings: dict | None = None,
+        self,
+        name: str,
+        slug: str,
+        settings: dict | None = None,
     ) -> asyncpg.Record:
         async with self._pool.acquire() as conn:
             try:
-                return await conn.fetchrow(
+                row = await conn.fetchrow(
                     sql.query("insert_tenant"),
-                    name, slug, json.dumps(settings or {}),
+                    name,
+                    slug,
+                    json.dumps(settings or {}),
                 )
             except asyncpg.UniqueViolationError as e:
+                detail = e.as_dict().get("detail", str(e))
                 raise DuplicateError(
-                    f"Tenant with this name or slug already exists: {e.detail}"
+                    f"Tenant with this name or slug already exists: {detail}"
                 ) from e
+
+        if self._cache:
+            await self._cache.delete(cache_key_tenants())
+
+        return row
 
     async def get_tenant(self, tenant_id: UUID) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
@@ -86,21 +107,48 @@ class TenantRepository:
             return await conn.fetchrow(sql.query("get_tenant_by_slug"), slug)
 
     async def list_tenants(self, limit: int = 50, offset: int = 0) -> list[asyncpg.Record]:
+        if self._cache:
+            key = cache_key_tenants()
+            cached = await self._cache.get(key)
+            if cached is not None:
+                return [dict(row) for row in cached]
+
         async with self._pool.acquire() as conn:
-            return await conn.fetch(sql.query("list_tenants"), limit, offset)
+            rows = await conn.fetch(sql.query("list_tenants"), limit, offset)
+
+        if self._cache and rows:
+            key = cache_key_tenants()
+            await self._cache.set(key, [dict(row) for row in rows], CACHE_TTL_TENANTS)
+
+        return rows
 
     async def update_tenant(
-        self, tenant_id: UUID, name: str, slug: str, settings: dict,
+        self,
+        tenant_id: UUID,
+        name: str,
+        slug: str,
+        settings: dict,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
-            return await conn.fetchrow(
+            row = await conn.fetchrow(
                 sql.query("update_tenant"),
-                tenant_id, name, slug, json.dumps(settings),
+                tenant_id,
+                name,
+                slug,
+                json.dumps(settings),
             )
+
+        if self._cache:
+            await self._cache.delete(cache_key_tenants())
+
+        return row
 
     async def deactivate_tenant(self, tenant_id: UUID) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(sql.query("deactivate_tenant"), tenant_id)
+
+        if self._cache:
+            await self._cache.delete(cache_key_tenants())
 
     # -- API Keys --
 
@@ -113,22 +161,46 @@ class TenantRepository:
         scopes: list[str] | None = None,
     ) -> asyncpg.Record:
         async with self._pool.acquire() as conn:
-            return await conn.fetchrow(
+            row = await conn.fetchrow(
                 sql.query("insert_api_key"),
-                tenant_id, key_hash, key_prefix, name, scopes or [],
+                tenant_id,
+                key_hash,
+                key_prefix,
+                name,
+                scopes or [],
             )
+
+        if self._cache:
+            await self._cache.delete(cache_key_api_keys(str(tenant_id)))
+
+        return row
 
     async def get_api_key_by_hash(self, key_hash: str) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(sql.query("get_api_key_by_hash"), key_hash)
 
     async def list_api_keys(self, tenant_id: UUID) -> list[asyncpg.Record]:
+        if self._cache:
+            key = cache_key_api_keys(str(tenant_id))
+            cached = await self._cache.get(key)
+            if cached is not None:
+                return [dict(row) for row in cached]
+
         async with self._pool.acquire() as conn:
-            return await conn.fetch(sql.query("list_api_keys"), tenant_id)
+            rows = await conn.fetch(sql.query("list_api_keys"), tenant_id)
+
+        if self._cache and rows:
+            key = cache_key_api_keys(str(tenant_id))
+            await self._cache.set(key, [dict(row) for row in rows], CACHE_TTL_API_KEYS)
+
+        return rows
 
     async def revoke_api_key(self, key_id: UUID, tenant_id: UUID) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(sql.query("revoke_api_key"), key_id, tenant_id)
+
+        if self._cache:
+            await self._cache.delete(cache_key_api_keys(str(tenant_id)))
 
     async def touch_api_key(self, key_hash: str) -> None:
         async with self._pool.acquire() as conn:
@@ -146,9 +218,12 @@ class TenantRepository:
         api_base: str | None = None,
         extra_params: dict | None = None,
     ) -> asyncpg.Record:
+        # Invalidate cache before returning to prevent stale reads
+        cache_k = cache_key_models(str(tenant_id)) if self._cache else None
+
         async with self._pool.acquire() as conn:
             try:
-                return await conn.fetchrow(
+                row = await conn.fetchrow(
                     sql.query("insert_tenant_model"),
                     tenant_id,
                     model_name,
@@ -159,25 +234,47 @@ class TenantRepository:
                     json.dumps(extra_params or {}),
                 )
             except asyncpg.UniqueViolationError as e:
-                raise DuplicateError(
-                    f"Model '{model_name}' already exists for this tenant"
-                ) from e
+                raise DuplicateError(f"Model '{model_name}' already exists for this tenant") from e
+
+        if self._cache and cache_k:
+            await self._cache.delete(cache_k)
+
+        return row
 
     async def get_model(self, model_id: UUID, tenant_id: UUID) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(sql.query("get_tenant_model"), model_id, tenant_id)
 
     async def get_model_by_name(
-        self, tenant_id: UUID, model_name: str,
+        self,
+        tenant_id: UUID,
+        model_name: str,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(
-                sql.query("get_tenant_model_by_name"), tenant_id, model_name,
+                sql.query("get_tenant_model_by_name"),
+                tenant_id,
+                model_name,
             )
 
     async def list_models(self, tenant_id: UUID) -> list[asyncpg.Record]:
+        # Try cache first
+        if self._cache:
+            key = cache_key_models(str(tenant_id))
+            cached = await self._cache.get(key)
+            if cached is not None:
+                return [dict(row) for row in cached]
+
+        # Fetch from DB
         async with self._pool.acquire() as conn:
-            return await conn.fetch(sql.query("list_tenant_models"), tenant_id)
+            rows = await conn.fetch(sql.query("list_tenant_models"), tenant_id)
+
+        # Cache result
+        if self._cache and rows:
+            key = cache_key_models(str(tenant_id))
+            await self._cache.set(key, [dict(row) for row in rows], CACHE_TTL_MODELS)
+
+        return rows
 
     async def update_model(
         self,
@@ -191,7 +288,7 @@ class TenantRepository:
         extra_params: dict,
     ) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
-            return await conn.fetchrow(
+            row = await conn.fetchrow(
                 sql.query("update_tenant_model"),
                 model_id,
                 tenant_id,
@@ -203,6 +300,14 @@ class TenantRepository:
                 json.dumps(extra_params),
             )
 
+        if self._cache:
+            await self._cache.delete(cache_key_models(str(tenant_id)))
+
+        return row
+
     async def delete_model(self, model_id: UUID, tenant_id: UUID) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(sql.query("delete_tenant_model"), model_id, tenant_id)
+
+        if self._cache:
+            await self._cache.delete(cache_key_models(str(tenant_id)))

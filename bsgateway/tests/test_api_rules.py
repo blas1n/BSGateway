@@ -1,4 +1,5 @@
 """Tests for rules and intents API endpoints."""
+
 from __future__ import annotations
 
 import json
@@ -12,18 +13,15 @@ from fastapi.testclient import TestClient
 
 from bsgateway.api.app import create_app
 from bsgateway.core.security import hash_api_key
+from bsgateway.tests.conftest import make_mock_pool
 
 SUPERADMIN_KEY = "test-superadmin-key"
 ENCRYPTION_KEY_HEX = os.urandom(32).hex()
 
 
 @pytest.fixture
-def mock_pool() -> AsyncMock:
-    pool = AsyncMock()
-    pool._closed = False
-    conn = AsyncMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+def mock_pool():
+    pool, _conn = make_mock_pool()
     return pool
 
 
@@ -47,8 +45,12 @@ def admin_headers() -> dict:
 
 
 def _rule_row(
-    tenant_id=None, rule_id=None, name="test-rule",
-    priority=1, is_default=False, target="gpt-4o",
+    tenant_id=None,
+    rule_id=None,
+    name="test-rule",
+    priority=1,
+    is_default=False,
+    target="gpt-4o",
 ):
     now = datetime.now(UTC)
     return {
@@ -111,9 +113,13 @@ class TestRulesCRUD:
                 return_value=[],
             ),
             patch(
-                "bsgateway.rules.repository.RulesRepository.list_conditions",
+                "bsgateway.rules.repository.RulesRepository.list_conditions_for_tenant",
                 new_callable=AsyncMock,
                 return_value=[],
+            ),
+            patch(
+                "bsgateway.audit.repository.AuditRepository.record",
+                new_callable=AsyncMock,
             ),
         ):
             resp = client.post(
@@ -157,34 +163,30 @@ class TestRulesCRUD:
             assert resp.status_code == 400
             assert "not registered" in resp.json()["detail"]
 
-    def test_create_default_rule_skips_model_validation(
-        self, client: TestClient, admin_headers: dict,
+    def test_create_default_rule_validates_model(
+        self,
+        client: TestClient,
+        admin_headers: dict,
     ):
+        """Default rules also require a valid target_model."""
         tid = uuid4()
-        row = _rule_row(tenant_id=tid, is_default=True, target="fallback-model")
-        with (
-            patch(
-                "bsgateway.rules.repository.RulesRepository.create_rule",
-                new_callable=AsyncMock,
-                return_value=row,
-            ),
-            patch(
-                "bsgateway.rules.repository.RulesRepository.list_conditions",
-                new_callable=AsyncMock,
-                return_value=[],
-            ),
+        with patch(
+            "bsgateway.tenant.repository.TenantRepository.get_model_by_name",
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = client.post(
                 f"/api/v1/tenants/{tid}/rules",
                 json={
                     "name": "default",
                     "priority": 99,
-                    "target_model": "fallback-model",
+                    "target_model": "nonexistent-model",
                     "is_default": True,
                 },
                 headers=admin_headers,
             )
-            assert resp.status_code == 201
+            assert resp.status_code == 400
+            assert "not registered" in resp.json()["detail"]
 
     def test_list_rules(self, client: TestClient, admin_headers: dict):
         tid = uuid4()
@@ -201,15 +203,22 @@ class TestRulesCRUD:
             ),
         ):
             resp = client.get(
-                f"/api/v1/tenants/{tid}/rules", headers=admin_headers,
+                f"/api/v1/tenants/{tid}/rules",
+                headers=admin_headers,
             )
             assert resp.status_code == 200
             assert len(resp.json()) == 1
 
     def test_delete_rule(self, client: TestClient, admin_headers: dict):
-        with patch(
-            "bsgateway.rules.repository.RulesRepository.delete_rule",
-            new_callable=AsyncMock,
+        with (
+            patch(
+                "bsgateway.rules.repository.RulesRepository.delete_rule",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "bsgateway.audit.repository.AuditRepository.record",
+                new_callable=AsyncMock,
+            ),
         ):
             resp = client.delete(
                 f"/api/v1/tenants/{uuid4()}/rules/{uuid4()}",
@@ -264,9 +273,7 @@ class TestRuleTest:
             resp = client.post(
                 f"/api/v1/tenants/{tid}/rules/test",
                 json={
-                    "messages": [
-                        {"role": "user", "content": "Hello world"}
-                    ],
+                    "messages": [{"role": "user", "content": "Hello world"}],
                     "model": "auto",
                 },
                 headers=admin_headers,
@@ -372,6 +379,177 @@ class TestIntentsCRUD:
         ):
             resp = client.get(
                 f"/api/v1/tenants/{uuid4()}/intents/{uuid4()}",
+                headers=admin_headers,
+            )
+            assert resp.status_code == 404
+
+    def test_get_intent(self, client: TestClient, admin_headers: dict):
+        tid = uuid4()
+        iid = uuid4()
+        row = _intent_row(tenant_id=tid, intent_id=iid)
+        with patch(
+            "bsgateway.rules.repository.RulesRepository.get_intent",
+            new_callable=AsyncMock,
+            return_value=row,
+        ):
+            resp = client.get(
+                f"/api/v1/tenants/{tid}/intents/{iid}",
+                headers=admin_headers,
+            )
+            assert resp.status_code == 200
+            assert resp.json()["name"] == "test-intent"
+
+    def test_update_intent(self, client: TestClient, admin_headers: dict):
+        tid = uuid4()
+        iid = uuid4()
+        existing = _intent_row(tenant_id=tid, intent_id=iid)
+        updated = _intent_row(tenant_id=tid, intent_id=iid, name="updated-intent")
+        with (
+            patch(
+                "bsgateway.rules.repository.RulesRepository.get_intent",
+                new_callable=AsyncMock,
+                return_value=existing,
+            ),
+            patch(
+                "bsgateway.rules.repository.RulesRepository.update_intent",
+                new_callable=AsyncMock,
+                return_value=updated,
+            ),
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}/intents/{iid}",
+                json={"name": "updated-intent"},
+                headers=admin_headers,
+            )
+            assert resp.status_code == 200
+            assert resp.json()["name"] == "updated-intent"
+
+    def test_update_intent_not_found_on_get(self, client: TestClient, admin_headers: dict):
+        with patch(
+            "bsgateway.rules.repository.RulesRepository.get_intent",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{uuid4()}/intents/{uuid4()}",
+                json={"name": "x"},
+                headers=admin_headers,
+            )
+            assert resp.status_code == 404
+
+    def test_update_intent_not_found_on_update(self, client: TestClient, admin_headers: dict):
+        tid = uuid4()
+        iid = uuid4()
+        existing = _intent_row(tenant_id=tid, intent_id=iid)
+        with (
+            patch(
+                "bsgateway.rules.repository.RulesRepository.get_intent",
+                new_callable=AsyncMock,
+                return_value=existing,
+            ),
+            patch(
+                "bsgateway.rules.repository.RulesRepository.update_intent",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+        ):
+            resp = client.patch(
+                f"/api/v1/tenants/{tid}/intents/{iid}",
+                json={"name": "x"},
+                headers=admin_headers,
+            )
+            assert resp.status_code == 404
+
+    def test_add_example(self, client: TestClient, admin_headers: dict):
+        tid = uuid4()
+        iid = uuid4()
+        intent_row = _intent_row(tenant_id=tid, intent_id=iid)
+        example_row = {
+            "id": uuid4(),
+            "intent_id": iid,
+            "text": "example text",
+            "created_at": datetime.now(UTC),
+        }
+        with (
+            patch(
+                "bsgateway.rules.repository.RulesRepository.get_intent",
+                new_callable=AsyncMock,
+                return_value=intent_row,
+            ),
+            patch(
+                "bsgateway.rules.repository.RulesRepository.add_example",
+                new_callable=AsyncMock,
+                return_value=example_row,
+            ),
+        ):
+            resp = client.post(
+                f"/api/v1/tenants/{tid}/intents/{iid}/examples",
+                json={"text": "example text"},
+                headers=admin_headers,
+            )
+            assert resp.status_code == 201
+            assert resp.json()["text"] == "example text"
+
+    def test_add_example_intent_not_found(self, client: TestClient, admin_headers: dict):
+        with patch(
+            "bsgateway.rules.repository.RulesRepository.get_intent",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = client.post(
+                f"/api/v1/tenants/{uuid4()}/intents/{uuid4()}/examples",
+                json={"text": "example text"},
+                headers=admin_headers,
+            )
+            assert resp.status_code == 404
+
+    def test_list_examples(self, client: TestClient, admin_headers: dict):
+        tid = uuid4()
+        iid = uuid4()
+        intent_row = _intent_row(tenant_id=tid, intent_id=iid)
+        example_rows = [
+            {
+                "id": uuid4(),
+                "intent_id": iid,
+                "text": "example 1",
+                "created_at": datetime.now(UTC),
+            },
+            {
+                "id": uuid4(),
+                "intent_id": iid,
+                "text": "example 2",
+                "created_at": datetime.now(UTC),
+            },
+        ]
+        with (
+            patch(
+                "bsgateway.rules.repository.RulesRepository.get_intent",
+                new_callable=AsyncMock,
+                return_value=intent_row,
+            ),
+            patch(
+                "bsgateway.rules.repository.RulesRepository.list_examples",
+                new_callable=AsyncMock,
+                return_value=example_rows,
+            ),
+        ):
+            resp = client.get(
+                f"/api/v1/tenants/{tid}/intents/{iid}/examples",
+                headers=admin_headers,
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 2
+            assert data[0]["text"] == "example 1"
+
+    def test_list_examples_intent_not_found(self, client: TestClient, admin_headers: dict):
+        with patch(
+            "bsgateway.rules.repository.RulesRepository.get_intent",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = client.get(
+                f"/api/v1/tenants/{uuid4()}/intents/{uuid4()}/examples",
                 headers=admin_headers,
             )
             assert resp.status_code == 404

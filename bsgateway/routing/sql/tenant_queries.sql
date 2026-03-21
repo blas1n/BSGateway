@@ -32,7 +32,8 @@ RETURNING id, tenant_id, key_prefix, name, scopes, is_active, expires_at, last_u
 -- name: get_api_key_by_hash
 SELECT ak.id, ak.tenant_id, ak.key_hash, ak.key_prefix, ak.name,
        ak.scopes, ak.is_active, ak.expires_at, ak.last_used_at, ak.created_at,
-       t.is_active as tenant_is_active
+       t.is_active as tenant_is_active,
+       t.name as tenant_name, t.slug as tenant_slug
 FROM tenant_api_keys ak
 JOIN tenants t ON t.id = ak.tenant_id
 WHERE ak.key_hash = $1;
@@ -76,3 +77,9 @@ RETURNING id, tenant_id, model_name, provider, litellm_model, api_base, is_activ
 
 -- name: delete_tenant_model
 DELETE FROM tenant_models WHERE id = $1 AND tenant_id = $2;
+
+-- name: list_active_models_with_keys
+SELECT id, tenant_id, model_name, provider, litellm_model,
+       api_key_encrypted, api_base, is_active, extra_params
+FROM tenant_models WHERE tenant_id = $1 AND is_active = TRUE
+ORDER BY model_name;

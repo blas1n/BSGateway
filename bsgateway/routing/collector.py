@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import struct
 from pathlib import Path
@@ -35,7 +36,11 @@ class SqlLoader:
         return self._queries[name]
 
     def _parse_queries(self) -> None:
-        content = (self._sql_dir / "queries.sql").read_text()
+        for sql_file in sorted(self._sql_dir.glob("*queries.sql")):
+            self._parse_file(sql_file)
+
+    def _parse_file(self, path: Path) -> None:
+        content = path.read_text()
         current_name: str | None = None
         current_lines: list[str] = []
         for line in content.splitlines():
@@ -67,20 +72,24 @@ class RoutingCollector:
     ) -> None:
         self.database_url = database_url
         self.embedding_config = embedding_config
-        self._pool: asyncpg.Pool | None = None
+        self._pool: asyncpg.Pool = None  # type: ignore[assignment]
         self._initialized = False
+        self._init_lock = asyncio.Lock()
 
     async def _ensure_db(self) -> None:
         if self._initialized:
             return
-        self._pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5)
-        schema = sql.schema()
-        async with self._pool.acquire() as conn:
-            for statement in schema.split(";"):
-                statement = statement.strip()
-                if statement:
-                    await conn.execute(statement)
-        self._initialized = True
+        async with self._init_lock:
+            if self._initialized:
+                return
+            self._pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5)
+            schema = sql.schema()
+            async with self._pool.acquire() as conn:
+                for statement in schema.split(";"):
+                    statement = statement.strip()
+                    if statement:
+                        await conn.execute(statement)
+            self._initialized = True
 
     async def record(
         self,
@@ -125,7 +134,7 @@ class RoutingCollector:
         )
 
     async def _generate_embedding(self, text: str) -> bytes | None:
-        if not text:
+        if not text or not self.embedding_config:
             return None
         try:
             response = await litellm.aembedding(
@@ -146,14 +155,10 @@ class RoutingCollector:
         code_blocks = re.findall(r"```[\s\S]*?```", all_text)
         return {
             "token_count": int(len(all_text.split()) * 1.3),
-            "conversation_turns": len(
-                [m for m in messages if m.get("role") == "user"]
-            ),
+            "conversation_turns": len([m for m in messages if m.get("role") == "user"]),
             "code_block_count": len(code_blocks),
             "code_lines": sum(b.count("\n") for b in code_blocks),
-            "has_error_trace": any(
-                p in all_text for p in ["Traceback", "Error:", "Exception"]
-            ),
+            "has_error_trace": any(p in all_text for p in ["Traceback", "Error:", "Exception"]),
             "tool_count": len(data.get("tools", [])),
         }
 

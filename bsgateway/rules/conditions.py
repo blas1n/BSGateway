@@ -3,7 +3,37 @@ from __future__ import annotations
 import re
 from typing import Any
 
+import structlog
+
 from bsgateway.rules.models import EvaluationContext, RuleCondition
+
+logger = structlog.get_logger(__name__)
+
+# Pre-compiled ReDoS detection pattern (nested quantifiers)
+_REDOS_PATTERN = re.compile(r"\(.+[*+]\)[*+?]|\[.+[*+]\][*+?]")
+
+# Allowed fields for rule conditions — prevents access to internal/dunder attributes
+_ALLOWED_FIELDS: frozenset[str] = frozenset(
+    {
+        "user_text",
+        "system_prompt",
+        "all_text",
+        "estimated_tokens",
+        "conversation_turns",
+        "has_code_blocks",
+        "has_error_trace",
+        "tool_count",
+        "tool_names",
+        "original_model",
+        "classified_intent",
+        "detected_language",
+        "hour_of_day",
+        "day_of_week",
+        "daily_cost",
+        "monthly_cost",
+        "request_count_hourly",
+    }
+)
 
 
 def evaluate_condition(condition: RuleCondition, ctx: EvaluationContext) -> bool:
@@ -11,6 +41,14 @@ def evaluate_condition(condition: RuleCondition, ctx: EvaluationContext) -> bool
 
     Returns True if the condition matches (before negate is applied).
     """
+    if condition.field not in _ALLOWED_FIELDS:
+        logger.warning(
+            "invalid_condition_field",
+            field=condition.field,
+            allowed=sorted(_ALLOWED_FIELDS),
+            hint="condition will never match — check for typos",
+        )
+        return False
     result = _evaluate_raw(condition, ctx)
     return (not result) if condition.negate else result
 
@@ -29,7 +67,7 @@ def _evaluate_raw(condition: RuleCondition, ctx: EvaluationContext) -> bool:
         if len(pattern) > 500:
             return False
         # Reject patterns with nested quantifiers (ReDoS risk)
-        if re.search(r"\(.+[*+]\)[*+?]", pattern):
+        if _REDOS_PATTERN.search(pattern):
             return False
         try:
             return bool(re.search(pattern, str(field_value), re.IGNORECASE))

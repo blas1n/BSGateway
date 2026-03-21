@@ -112,8 +112,14 @@ class StaticClassifier:
         if not prompt:
             return 0
         complexity_words = [
-            "architect", "design", "analyze", "review",
-            "plan", "refactor", "security", "optimize",
+            "architect",
+            "design",
+            "analyze",
+            "review",
+            "plan",
+            "refactor",
+            "security",
+            "optimize",
         ]
         matches = sum(1 for w in complexity_words if w in prompt.lower())
         base = min(40, len(prompt) // 50)
@@ -122,12 +128,8 @@ class StaticClassifier:
 
     def _score_keywords(self, text: str) -> int:
         text_lower = text.lower()
-        complex_count = sum(
-            1 for kw in self.config.complex_keywords if kw in text_lower
-        )
-        simple_count = sum(
-            1 for kw in self.config.simple_keywords if kw in text_lower
-        )
+        complex_count = sum(1 for kw in self.config.complex_keywords if kw in text_lower)
+        simple_count = sum(1 for kw in self.config.simple_keywords if kw in text_lower)
 
         if complex_count > 0 and simple_count == 0:
             return min(100, 50 + complex_count * 10)

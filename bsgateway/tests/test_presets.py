@@ -2,6 +2,7 @@
 
 TDD: Tests written FIRST.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -15,7 +16,9 @@ from bsgateway.presets.models import (
     ModelMapping,
 )
 from bsgateway.presets.registry import PresetRegistry, get_builtin_presets
+from bsgateway.presets.repository import FeedbackRepository, FeedbackSqlLoader
 from bsgateway.presets.service import PresetService
+from bsgateway.tests.conftest import MockTransaction, make_mock_pool
 
 
 class TestPresetRegistry:
@@ -117,7 +120,9 @@ class TestPresetService:
         return repo
 
     async def test_apply_preset(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         service = PresetService(mock_rules_repo, mock_tenant_repo)
         tid = uuid4()
@@ -139,7 +144,9 @@ class TestPresetService:
         assert result.intents_created > 0
 
     async def test_apply_preset_unknown(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         service = PresetService(mock_rules_repo, mock_tenant_repo)
         with pytest.raises(ValueError, match="Unknown preset"):
@@ -147,12 +154,16 @@ class TestPresetService:
                 tenant_id=uuid4(),
                 preset_name="nonexistent",
                 model_mapping=ModelMapping(
-                    economy="a", balanced="b", premium="c",
+                    economy="a",
+                    balanced="b",
+                    premium="c",
                 ),
             )
 
     async def test_apply_preset_idempotency(
-        self, mock_rules_repo: AsyncMock, mock_tenant_repo: AsyncMock,
+        self,
+        mock_rules_repo: AsyncMock,
+        mock_tenant_repo: AsyncMock,
     ):
         """Applying the same preset twice should fail with a clear error."""
         mock_rules_repo.list_intents.return_value = [
@@ -191,3 +202,88 @@ class TestFeedbackModels:
 
         with pytest.raises(Exception):
             FeedbackCreate(routing_id="x", rating=0)
+
+
+class TestFeedbackSqlLoader:
+    def test_schema_loads(self):
+        loader = FeedbackSqlLoader()
+        schema = loader.schema()
+        assert "routing_feedback" in schema
+
+    def test_query_loads(self):
+        loader = FeedbackSqlLoader()
+        q = loader.query("insert_feedback")
+        assert "INSERT" in q
+
+    def test_query_list_feedback(self):
+        loader = FeedbackSqlLoader()
+        q = loader.query("list_feedback")
+        assert "SELECT" in q
+
+    def test_query_get_feedback_stats(self):
+        loader = FeedbackSqlLoader()
+        q = loader.query("get_feedback_stats")
+        assert "AVG" in q
+
+
+class TestFeedbackRepository:
+    @pytest.fixture
+    def pool_and_conn(self):
+        pool, conn = make_mock_pool()
+        return pool, conn
+
+    async def test_init_schema(self, pool_and_conn):
+        pool, conn = pool_and_conn
+        conn.execute = AsyncMock()
+        # transaction() needs to be a sync call returning an async context manager
+        conn.transaction = MagicMock(return_value=MockTransaction())
+        repo = FeedbackRepository(pool)
+        await repo.init_schema()
+        assert conn.execute.call_count > 0
+
+    async def test_create_feedback(self, pool_and_conn):
+        pool, conn = pool_and_conn
+        tid = uuid4()
+        expected = {
+            "id": uuid4(),
+            "tenant_id": tid,
+            "routing_id": "route-1",
+            "rating": 4,
+            "comment": "good",
+            "created_at": datetime.now(UTC),
+        }
+        conn.fetchrow = AsyncMock(return_value=expected)
+        repo = FeedbackRepository(pool)
+        result = await repo.create_feedback(tid, "route-1", 4, "good")
+        assert result == expected
+        conn.fetchrow.assert_called_once()
+
+    async def test_list_feedback(self, pool_and_conn):
+        pool, conn = pool_and_conn
+        tid = uuid4()
+        rows = [
+            {
+                "id": uuid4(),
+                "tenant_id": tid,
+                "routing_id": "r1",
+                "rating": 3,
+                "comment": "",
+                "created_at": datetime.now(UTC),
+            }
+        ]
+        conn.fetch = AsyncMock(return_value=rows)
+        repo = FeedbackRepository(pool)
+        result = await repo.list_feedback(tid, limit=10, offset=0)
+        assert len(result) == 1
+        conn.fetch.assert_called_once()
+
+    async def test_get_stats(self, pool_and_conn):
+        pool, conn = pool_and_conn
+        tid = uuid4()
+        stats = {"total": 10, "avg_rating": 3.5, "positive": 6, "negative": 2}
+        conn.fetchrow = AsyncMock(return_value=stats)
+        repo = FeedbackRepository(pool)
+        result = await repo.get_stats(tid)
+        assert result["total"] == 10
+        assert result["avg_rating"] == 3.5
+        conn.fetchrow.assert_called_once()

@@ -165,14 +165,9 @@ class EvaluationContext:
             system_prompt=system_prompt,
             all_text=all_text,
             estimated_tokens=_estimate_tokens(all_text),
-            conversation_turns=len(
-                [m for m in messages if m.get("role") == "user"]
-            ),
+            conversation_turns=len([m for m in messages if m.get("role") == "user"]),
             has_code_blocks=bool(re.search(r"```", all_text)),
-            has_error_trace=any(
-                p in all_text
-                for p in ["Traceback", "Error:", "Exception"]
-            ),
+            has_error_trace=any(p in all_text for p in ["Traceback", "Error:", "Exception"]),
             tool_count=len(tools),
             tool_names=tool_names,
             original_model=data.get("model", ""),
