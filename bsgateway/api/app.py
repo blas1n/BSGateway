@@ -96,6 +96,11 @@ async def lifespan(app: FastAPI):
     audit_repo = AuditRepository(pool)
     await audit_repo.init_schema()
 
+    from bsgateway.apikey.repository import ApiKeyRepository
+
+    apikey_repo = ApiKeyRepository(pool)
+    await apikey_repo.init_schema()
+
     logger.info("api_server_started", port=settings.api_port)
     yield
 
@@ -152,6 +157,7 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
 
+    from bsgateway.api.routers.apikeys import router as apikeys_router
     from bsgateway.api.routers.audit import router as audit_router
     from bsgateway.api.routers.chat import router as chat_router
     from bsgateway.api.routers.feedback import router as feedback_router
@@ -169,6 +175,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router, prefix="/api/v1")
     app.include_router(usage_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
+    app.include_router(apikeys_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
     async def health() -> dict:

@@ -43,16 +43,14 @@ class GatewayAuthContext:
 
 
 async def get_auth_context(request: Request) -> GatewayAuthContext:
-    """Authenticate a request via Supabase JWT (BSVibe-Auth).
+    """Authenticate via API key (bsg_live_*) or Supabase JWT.
 
-    1. Verify JWT → BSVibeUser
-    2. Extract tenant_id from app_metadata
-    3. Check tenant is active in DB
-    4. Return GatewayAuthContext
+    1. Check Authorization header
+    2. If token starts with "bsg_live_" → API key auth path
+    3. Otherwise → JWT auth path (existing)
+    4. Verify tenant is active
+    5. Return GatewayAuthContext
     """
-    from bsvibe_auth import AuthError
-
-    auth_provider = request.app.state.auth_provider
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(
@@ -61,6 +59,67 @@ async def get_auth_context(request: Request) -> GatewayAuthContext:
         )
 
     token = auth_header[7:]
+
+    # --- API Key auth path ---
+    if token.startswith("bsg_live_"):
+        return await _auth_via_apikey(request, token)
+
+    # --- JWT auth path ---
+    return await _auth_via_jwt(request, token)
+
+
+async def _auth_via_apikey(request: Request, raw_key: str) -> GatewayAuthContext:
+    """Authenticate using a tenant API key."""
+    from bsgateway.apikey.service import ApiKeyService
+
+    pool: asyncpg.Pool = request.app.state.db_pool
+    svc = ApiKeyService(pool)
+    result = await svc.validate_key(raw_key)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+
+    # Verify tenant is active
+    from bsgateway.tenant.repository import TenantRepository
+
+    repo = TenantRepository(pool)
+    tenant_row = await repo.get_tenant(result.tenant_id)
+
+    if not tenant_row or not tenant_row["is_active"]:
+        logger.warning("auth_failed", reason="tenant_inactive", tenant_id=str(result.tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant is deactivated",
+        )
+
+    # API key auth grants member-level access to its own tenant
+    from bsvibe_auth import BSVibeUser
+
+    synthetic_user = BSVibeUser(
+        id=f"apikey:{result.key_id}",
+        email="",
+        role="authenticated",
+        app_metadata={"tenant_id": str(result.tenant_id), "role": "member"},
+        user_metadata={},
+    )
+
+    logger.info("auth_success_apikey", tenant_id=str(result.tenant_id), key_id=str(result.key_id))
+
+    return GatewayAuthContext(
+        user=synthetic_user,
+        tenant_id=result.tenant_id,
+        is_admin=False,
+    )
+
+
+async def _auth_via_jwt(request: Request, token: str) -> GatewayAuthContext:
+    """Authenticate using Supabase JWT (existing path)."""
+    from bsvibe_auth import AuthError
+
+    auth_provider = request.app.state.auth_provider
 
     try:
         user = await auth_provider.verify_token(token)
