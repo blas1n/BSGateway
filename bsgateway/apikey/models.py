@@ -18,6 +18,8 @@ class ApiKeyCreate(BaseModel):
 
 
 class ApiKeyCreatedResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: UUID
     tenant_id: UUID
     name: str
@@ -28,6 +30,8 @@ class ApiKeyCreatedResponse(BaseModel):
 
 
 class ApiKeyInfoResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: UUID
     tenant_id: UUID
     name: str

@@ -43,15 +43,7 @@ async def create_api_key(
         scopes=body.scopes,
         expires_in_days=body.expires_in_days,
     )
-    return ApiKeyCreatedResponse(
-        id=result.id,
-        tenant_id=result.tenant_id,
-        name=result.name,
-        key_prefix=result.key_prefix,
-        raw_key=result.raw_key,
-        scopes=result.scopes,
-        created_at=result.created_at,
-    )
+    return ApiKeyCreatedResponse.model_validate(result)
 
 
 @router.get(
@@ -66,20 +58,7 @@ async def list_api_keys(
 ) -> list[ApiKeyInfoResponse]:
     svc = _get_apikey_service(request)
     keys = await svc.list_keys(tenant_id)
-    return [
-        ApiKeyInfoResponse(
-            id=k.id,
-            tenant_id=k.tenant_id,
-            name=k.name,
-            key_prefix=k.key_prefix,
-            scopes=k.scopes,
-            is_active=k.is_active,
-            expires_at=k.expires_at,
-            last_used_at=k.last_used_at,
-            created_at=k.created_at,
-        )
-        for k in keys
-    ]
+    return [ApiKeyInfoResponse.model_validate(k) for k in keys]
 
 
 @router.delete(

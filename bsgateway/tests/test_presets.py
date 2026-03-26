@@ -12,11 +12,11 @@ from uuid import uuid4
 
 import pytest
 
+from bsgateway.core.sql_loader import NamedSqlLoader
 from bsgateway.presets.models import (
     ModelMapping,
 )
 from bsgateway.presets.registry import PresetRegistry, get_builtin_presets
-from bsgateway.core.sql_loader import NamedSqlLoader
 from bsgateway.presets.repository import FeedbackRepository
 from bsgateway.presets.service import PresetService
 from bsgateway.tests.conftest import MockTransaction, make_mock_pool
