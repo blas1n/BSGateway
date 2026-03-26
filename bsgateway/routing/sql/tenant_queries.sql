@@ -3,6 +3,12 @@ INSERT INTO tenants (name, slug, settings)
 VALUES ($1, $2, $3)
 RETURNING id, name, slug, is_active, settings, created_at, updated_at;
 
+-- name: insert_tenant_with_id
+INSERT INTO tenants (id, name, slug, settings)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO NOTHING
+RETURNING id, name, slug, is_active, settings, created_at, updated_at;
+
 -- name: get_tenant_by_id
 SELECT id, name, slug, is_active, settings, created_at, updated_at
 FROM tenants WHERE id = $1;

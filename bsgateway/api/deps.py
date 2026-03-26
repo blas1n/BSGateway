@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 import asyncpg
 import structlog
 from fastapi import Depends, HTTPException, Request, status
 
+from bsgateway.apikey.service import API_KEY_PREFIX
 from bsgateway.core.cache import CacheManager
 
 if TYPE_CHECKING:
-    from bsvibe_auth import BSVibeUser
-
     from bsgateway.audit.service import AuditService
+    from bsgateway.tenant.repository import TenantRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -34,25 +34,33 @@ def get_cache(request: Request) -> CacheManager | None:
 
 
 @dataclass
-class GatewayAuthContext:
-    """Authenticated request context backed by BSVibe-Auth."""
+class AuthIdentity:
+    """Authenticated principal — either a Supabase user or an API key."""
 
-    user: BSVibeUser
+    kind: Literal["user", "apikey"]
+    id: str
+    email: str | None = None
+    scopes: list[str] = field(default_factory=lambda: ["chat"])
+
+
+@dataclass
+class GatewayAuthContext:
+    """Authenticated request context."""
+
+    identity: AuthIdentity
     tenant_id: UUID
     is_admin: bool
 
 
 async def get_auth_context(request: Request) -> GatewayAuthContext:
-    """Authenticate a request via Supabase JWT (BSVibe-Auth).
+    """Authenticate via API key (bsg_live_*) or Supabase JWT.
 
-    1. Verify JWT → BSVibeUser
-    2. Extract tenant_id from app_metadata
-    3. Check tenant is active in DB
-    4. Return GatewayAuthContext
+    1. Check Authorization header
+    2. If token starts with "bsg_live_" → API key auth path
+    3. Otherwise → JWT auth path (existing)
+    4. Verify tenant is active
+    5. Return GatewayAuthContext
     """
-    from bsvibe_auth import AuthError
-
-    auth_provider = request.app.state.auth_provider
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(
@@ -61,6 +69,68 @@ async def get_auth_context(request: Request) -> GatewayAuthContext:
         )
 
     token = auth_header[7:]
+
+    # --- API Key auth path ---
+    if token.startswith(API_KEY_PREFIX):
+        return await _auth_via_apikey(request, token)
+
+    # --- JWT auth path ---
+    return await _auth_via_jwt(request, token)
+
+
+async def _verify_tenant_active(
+    repo: TenantRepository, tenant_id: UUID,
+) -> None:
+    """Verify that a tenant exists and is active. Raises HTTPException if not."""
+    tenant_row = await repo.get_tenant(tenant_id)
+    if not tenant_row or not tenant_row["is_active"]:
+        logger.warning("auth_failed", reason="tenant_inactive", tenant_id=str(tenant_id))
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant is deactivated",
+        )
+
+
+async def _auth_via_apikey(request: Request, raw_key: str) -> GatewayAuthContext:
+    """Authenticate using a tenant API key."""
+    from bsgateway.apikey.service import ApiKeyService
+
+    pool: asyncpg.Pool = request.app.state.db_pool
+    cache = getattr(request.app.state, "cache", None)
+    bg_tasks: set = getattr(request.app.state, "background_tasks", set())
+    svc = ApiKeyService(pool)
+    result = await svc.validate_key(raw_key, background_tasks=bg_tasks)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+
+    # Verify tenant is active
+    from bsgateway.tenant.repository import TenantRepository
+
+    repo = TenantRepository(pool, cache=cache)
+    await _verify_tenant_active(repo, result.tenant_id)
+
+    logger.info("auth_success_apikey", tenant_id=str(result.tenant_id), key_id=str(result.key_id))
+
+    return GatewayAuthContext(
+        identity=AuthIdentity(
+            kind="apikey",
+            id=str(result.key_id),
+            scopes=result.scopes,
+        ),
+        tenant_id=result.tenant_id,
+        is_admin=False,
+    )
+
+
+async def _auth_via_jwt(request: Request, token: str) -> GatewayAuthContext:
+    """Authenticate using Supabase JWT (existing path)."""
+    from bsvibe_auth import AuthError
+
+    auth_provider = request.app.state.auth_provider
 
     try:
         user = await auth_provider.verify_token(token)
@@ -87,19 +157,30 @@ async def get_auth_context(request: Request) -> GatewayAuthContext:
             detail="Invalid tenant_id format",
         ) from err
 
-    # Verify tenant is active
+    # Verify tenant exists — auto-provision on first access
     from bsgateway.tenant.repository import TenantRepository
 
     pool: asyncpg.Pool = request.app.state.db_pool
-    repo = TenantRepository(pool)
+    cache = getattr(request.app.state, "cache", None)
+    repo = TenantRepository(pool, cache=cache)
     tenant_row = await repo.get_tenant(tenant_id)
 
-    if not tenant_row or not tenant_row["is_active"]:
+    if tenant_row and not tenant_row["is_active"]:
         logger.warning("auth_failed", reason="tenant_inactive", tenant_id=str(tenant_id))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant is deactivated",
         )
+
+    if not tenant_row:
+        # Auto-provision: Supabase org is source of truth
+        short_id = str(tenant_id)[:8]
+        tenant_row = await repo.provision_tenant(
+            tenant_id=tenant_id,
+            name=short_id,
+            slug=short_id,
+        )
+        logger.info("tenant_auto_provisioned", tenant_id=str(tenant_id))
 
     role = user.app_metadata.get("role", "member")
     is_admin = role == "admin"
@@ -107,7 +188,11 @@ async def get_auth_context(request: Request) -> GatewayAuthContext:
     logger.info("auth_success", tenant_id=str(tenant_id), user_id=user.id, is_admin=is_admin)
 
     return GatewayAuthContext(
-        user=user,
+        identity=AuthIdentity(
+            kind="user",
+            id=user.id,
+            email=user.email,
+        ),
         tenant_id=tenant_id,
         is_admin=is_admin,
     )
