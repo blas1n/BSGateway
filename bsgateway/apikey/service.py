@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
+API_KEY_PREFIX = "bsg_live_"
 _KEY_PREFIX_LEN = 12  # "bsg_live_abc" — enough for identification
 
 
@@ -28,7 +30,7 @@ class ApiKeyService:
 
     def generate_raw_key(self) -> str:
         """Generate a new raw API key: bsg_live_ + 32 random bytes hex."""
-        return "bsg_live_" + os.urandom(32).hex()
+        return API_KEY_PREFIX + os.urandom(32).hex()
 
     def hash_key(self, raw_key: str) -> str:
         """SHA-256 hash of the raw key."""
@@ -53,7 +55,7 @@ class ApiKeyService:
 
         expires_at = None
         if expires_in_days:
-            expires_at = (datetime.now(UTC) + timedelta(days=expires_in_days)).isoformat()
+            expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
 
         row = await self._repo.create(
             tenant_id=tenant_id,
@@ -76,7 +78,9 @@ class ApiKeyService:
             created_at=row["created_at"],
         )
 
-    async def validate_key(self, raw_key: str) -> ValidatedKey | None:
+    async def validate_key(
+        self, raw_key: str, *, background_tasks: set[asyncio.Task] | None = None,
+    ) -> ValidatedKey | None:
         """Validate a raw API key. Returns None if invalid/expired/revoked."""
         key_hash = self.hash_key(raw_key)
         row = await self._repo.get_by_hash(key_hash)
@@ -90,8 +94,11 @@ class ApiKeyService:
         if row["expires_at"] and row["expires_at"] < datetime.now(UTC):
             return None
 
-        # Update last_used_at (fire-and-forget is fine, but we await for tests)
-        await self._repo.touch_last_used(row["id"])
+        # Fire-and-forget: update last_used_at outside the auth hot path
+        task = asyncio.create_task(self._repo.touch_last_used(row["id"]))
+        if background_tasks is not None:
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
 
         return ValidatedKey(
             key_id=row["id"],

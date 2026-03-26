@@ -104,7 +104,7 @@ class TestLifespan:
 
         with (
             patch("bsgateway.api.app.settings") as mock_settings,
-            pytest.raises(RuntimeError, match="SUPABASE_URL.*or SUPABASE_JWT_SECRET is required"),
+            pytest.raises(RuntimeError, match=r"SUPABASE_URL.*or SUPABASE_JWT_SECRET is required"),
         ):
             mock_settings.collector_database_url = "postgresql://test"
             mock_settings.encryption_key_bytes = b"x" * 32

@@ -16,7 +16,8 @@ from bsgateway.presets.models import (
     ModelMapping,
 )
 from bsgateway.presets.registry import PresetRegistry, get_builtin_presets
-from bsgateway.presets.repository import FeedbackRepository, FeedbackSqlLoader
+from bsgateway.core.sql_loader import NamedSqlLoader
+from bsgateway.presets.repository import FeedbackRepository
 from bsgateway.presets.service import PresetService
 from bsgateway.tests.conftest import MockTransaction, make_mock_pool
 
@@ -206,22 +207,22 @@ class TestFeedbackModels:
 
 class TestFeedbackSqlLoader:
     def test_schema_loads(self):
-        loader = FeedbackSqlLoader()
+        loader = NamedSqlLoader("feedback_schema.sql", "feedback_queries.sql")
         schema = loader.schema()
         assert "routing_feedback" in schema
 
     def test_query_loads(self):
-        loader = FeedbackSqlLoader()
+        loader = NamedSqlLoader("feedback_schema.sql", "feedback_queries.sql")
         q = loader.query("insert_feedback")
         assert "INSERT" in q
 
     def test_query_list_feedback(self):
-        loader = FeedbackSqlLoader()
+        loader = NamedSqlLoader("feedback_schema.sql", "feedback_queries.sql")
         q = loader.query("list_feedback")
         assert "SELECT" in q
 
     def test_query_get_feedback_stats(self):
-        loader = FeedbackSqlLoader()
+        loader = NamedSqlLoader("feedback_schema.sql", "feedback_queries.sql")
         q = loader.query("get_feedback_stats")
         assert "AVG" in q
 

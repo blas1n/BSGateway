@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -10,42 +9,11 @@ import structlog
 
 from bsgateway.core.cache import CACHE_TTL_RULES, CacheManager, cache_key_rules
 from bsgateway.core.exceptions import DuplicateError
+from bsgateway.core.sql_loader import NamedSqlLoader
 
 logger = structlog.get_logger(__name__)
 
-
-class RulesSqlLoader:
-    """Load named queries from rules_queries.sql."""
-
-    def __init__(self) -> None:
-        self._sql_dir = Path(__file__).parent.parent / "routing" / "sql"
-        self._queries: dict[str, str] = {}
-
-    def schema(self) -> str:
-        return (self._sql_dir / "rules_schema.sql").read_text()
-
-    def query(self, name: str) -> str:
-        if not self._queries:
-            self._parse_queries()
-        return self._queries[name]
-
-    def _parse_queries(self) -> None:
-        content = (self._sql_dir / "rules_queries.sql").read_text()
-        current_name: str | None = None
-        current_lines: list[str] = []
-        for line in content.splitlines():
-            if line.strip().startswith("-- name:"):
-                if current_name:
-                    self._queries[current_name] = "\n".join(current_lines).strip()
-                current_name = line.strip().split("-- name:")[1].strip()
-                current_lines = []
-            else:
-                current_lines.append(line)
-        if current_name:
-            self._queries[current_name] = "\n".join(current_lines).strip()
-
-
-sql = RulesSqlLoader()
+sql = NamedSqlLoader("rules_schema.sql", "rules_queries.sql")
 
 
 class RulesRepository:

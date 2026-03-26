@@ -1,6 +1,6 @@
 -- name: insert_api_key
 INSERT INTO api_keys (tenant_id, name, key_hash, key_prefix, scopes, expires_at)
-VALUES ($1, $2, $3, $4, $5::jsonb, $6::timestamptz)
+VALUES ($1, $2, $3, $4, $5::jsonb, $6)
 RETURNING id, tenant_id, name, key_hash, key_prefix, scopes, is_active, expires_at, last_used_at, created_at;
 
 -- name: get_api_key_by_hash
