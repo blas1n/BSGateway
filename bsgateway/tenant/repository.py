@@ -96,6 +96,31 @@ class TenantRepository:
 
         return row
 
+    async def provision_tenant(
+        self,
+        tenant_id: UUID,
+        name: str,
+        slug: str,
+        settings: dict | None = None,
+    ) -> asyncpg.Record:
+        """Create a tenant with a specific ID (for auto-provisioning from Supabase org)."""
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                sql.query("insert_tenant_with_id"),
+                tenant_id,
+                name,
+                slug,
+                json.dumps(settings or {}),
+            )
+
+        if self._cache:
+            await self._cache.delete(cache_key_tenants())
+
+        # ON CONFLICT DO NOTHING returns None if already exists
+        if not row:
+            return await self.get_tenant(tenant_id)
+        return row
+
     async def get_tenant(self, tenant_id: UUID) -> asyncpg.Record | None:
         async with self._pool.acquire() as conn:
             return await conn.fetchrow(sql.query("get_tenant_by_id"), tenant_id)

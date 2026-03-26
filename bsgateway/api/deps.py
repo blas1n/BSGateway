@@ -146,19 +146,29 @@ async def _auth_via_jwt(request: Request, token: str) -> GatewayAuthContext:
             detail="Invalid tenant_id format",
         ) from err
 
-    # Verify tenant is active
+    # Verify tenant exists — auto-provision on first access
     from bsgateway.tenant.repository import TenantRepository
 
     pool: asyncpg.Pool = request.app.state.db_pool
     repo = TenantRepository(pool)
     tenant_row = await repo.get_tenant(tenant_id)
 
-    if not tenant_row or not tenant_row["is_active"]:
+    if tenant_row and not tenant_row["is_active"]:
         logger.warning("auth_failed", reason="tenant_inactive", tenant_id=str(tenant_id))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant is deactivated",
         )
+
+    if not tenant_row:
+        # Auto-provision: Supabase org is source of truth
+        short_id = str(tenant_id)[:8]
+        tenant_row = await repo.provision_tenant(
+            tenant_id=tenant_id,
+            name=short_id,
+            slug=short_id,
+        )
+        logger.info("tenant_auto_provisioned", tenant_id=str(tenant_id))
 
     role = user.app_metadata.get("role", "member")
     is_admin = role == "admin"
