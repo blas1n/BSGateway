@@ -120,9 +120,9 @@ class TestRateLimiter:
         redis.incr = AsyncMock(return_value=1)
 
         limiter = RateLimiter(redis)
+        now = int(time.time())
         result = await limiter.check("tenant-1", rpm=60)
 
-        now = int(time.time())
         assert result.reset_at > now
         assert result.reset_at <= now + 60
 
