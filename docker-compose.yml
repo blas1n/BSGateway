@@ -52,8 +52,7 @@ services:
   redis:
     logging: *default-logging
     image: redis:7-alpine
-    command: >
-      sh -c '[ -n "$$REDIS_PASSWORD" ] && exec redis-server --requirepass "$$REDIS_PASSWORD" || exec redis-server'
+    command: sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     restart: unless-stopped

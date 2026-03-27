@@ -96,21 +96,22 @@ class TestRateLimiter:
 
     async def test_independent_per_tenant(self):
         redis = AsyncMock()
-        call_count = 0
+        captured_keys: list[str] = []
 
-        async def mock_incr(key):
-            nonlocal call_count
-            call_count += 1
-            return call_count  # Each call returns different count
+        async def mock_incr(key: str) -> int:
+            captured_keys.append(key)
+            return 1
 
         redis.incr = mock_incr
 
         limiter = RateLimiter(redis)
-        r1 = await limiter.check("tenant-a", rpm=60)
-        r2 = await limiter.check("tenant-b", rpm=60)
+        await limiter.check("tenant-a", rpm=60)
+        await limiter.check("tenant-b", rpm=60)
 
-        assert r1.allowed is True
-        assert r2.allowed is True
+        assert len(captured_keys) == 2
+        assert captured_keys[0] != captured_keys[1]
+        assert "tenant-a" in captured_keys[0]
+        assert "tenant-b" in captured_keys[1]
 
     async def test_reset_at_is_future_timestamp(self):
         import time
@@ -121,7 +122,9 @@ class TestRateLimiter:
         limiter = RateLimiter(redis)
         result = await limiter.check("tenant-1", rpm=60)
 
-        assert result.reset_at > int(time.time()) - 1
+        now = int(time.time())
+        assert result.reset_at > now
+        assert result.reset_at <= now + 60
 
 
 class TestRateLimitAPI:
