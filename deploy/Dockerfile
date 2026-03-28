@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Install Python dependencies (cache layer)
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml uv.lock* gateway.yaml ./
 COPY bsgateway/ ./bsgateway/
 RUN uv pip install --system --compile-bytecode --no-cache .
 
