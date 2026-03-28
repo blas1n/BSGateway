@@ -19,8 +19,19 @@ CREATE TABLE IF NOT EXISTS routing_logs (
     original_model TEXT NOT NULL,
     resolved_model TEXT NOT NULL,
     -- 임베딩 (BYTEA, float32 array)
-    embedding BYTEA
+    embedding BYTEA,
+    -- BSNexus 메타데이터
+    nexus_task_type TEXT,
+    nexus_priority TEXT,
+    nexus_complexity_hint INTEGER,
+    decision_source TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_routing_logs_tier ON routing_logs(tier);
 CREATE INDEX IF NOT EXISTS idx_routing_logs_timestamp ON routing_logs(timestamp);
+
+-- Migration: add BSNexus columns to existing tables
+ALTER TABLE routing_logs ADD COLUMN IF NOT EXISTS nexus_task_type TEXT;
+ALTER TABLE routing_logs ADD COLUMN IF NOT EXISTS nexus_priority TEXT;
+ALTER TABLE routing_logs ADD COLUMN IF NOT EXISTS nexus_complexity_hint INTEGER;
+ALTER TABLE routing_logs ADD COLUMN IF NOT EXISTS decision_source TEXT;

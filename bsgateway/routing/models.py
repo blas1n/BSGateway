@@ -13,6 +13,37 @@ class TierConfig:
 
 
 @dataclass
+class NexusHeaderConfig:
+    """Configurable header names for BSNexus metadata extraction."""
+
+    prefix: str = "x-bsnexus"
+    task_type_field: str = "task-type"
+    priority_field: str = "priority"
+    complexity_hint_field: str = "complexity-hint"
+
+    @property
+    def task_type(self) -> str:
+        return f"{self.prefix}-{self.task_type_field}"
+
+    @property
+    def priority(self) -> str:
+        return f"{self.prefix}-{self.priority_field}"
+
+    @property
+    def complexity_hint(self) -> str:
+        return f"{self.prefix}-{self.complexity_hint_field}"
+
+
+@dataclass
+class NexusMetadata:
+    """Optional task metadata extracted from X-BSNexus-* request headers."""
+
+    task_type: str | None = None
+    priority: str | None = None  # "low" | "medium" | "high" | "critical"
+    complexity_hint: int | None = None  # 0-100
+
+
+@dataclass
 class RoutingDecision:
     """Record of how a request was routed."""
 
@@ -21,6 +52,8 @@ class RoutingDecision:
     resolved_model: str
     complexity_score: int | None = None
     tier: str | None = None
+    nexus_metadata: NexusMetadata | None = None
+    decision_source: str | None = None  # "classifier" | "blend" | "priority_override"
 
 
 @dataclass
@@ -117,6 +150,7 @@ class RoutingConfig:
     classifier_strategy: str = "llm"
     llm_classifier: LLMClassifierConfig = field(default_factory=LLMClassifierConfig)
     collector: CollectorConfig = field(default_factory=CollectorConfig)
+    nexus_headers: NexusHeaderConfig = field(default_factory=NexusHeaderConfig)
     # Multi-region and advanced routing
     regions: list[RegionConfig] = field(default_factory=list)
     cost_optimization: CostOptimizationConfig = field(default_factory=CostOptimizationConfig)
