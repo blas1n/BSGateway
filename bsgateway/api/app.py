@@ -170,6 +170,7 @@ def create_app() -> FastAPI:
     from bsgateway.api.routers.rules import router as rules_router
     from bsgateway.api.routers.tenants import router as tenants_router
     from bsgateway.api.routers.usage import router as usage_router
+    from bsgateway.mcp.router import router as mcp_router
 
     app.include_router(chat_router, prefix="/api/v1")
     app.include_router(tenants_router, prefix="/api/v1")
@@ -180,6 +181,7 @@ def create_app() -> FastAPI:
     app.include_router(usage_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(apikeys_router, prefix="/api/v1")
+    app.include_router(mcp_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
     async def health() -> dict:
