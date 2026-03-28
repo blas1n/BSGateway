@@ -490,6 +490,27 @@ class TestNexusMetadataExtraction:
         assert nexus["complexity_hint"] is None
 
     @pytest.mark.asyncio
+    async def test_complexity_hint_clamped_to_valid_range(self, router: BSGatewayRouter) -> None:
+        """complexity_hint values outside 0-100 are clamped."""
+        for raw_value, expected in [("-10", 0), ("0", 0), ("100", 100), ("200", 100), ("50", 50)]:
+            data = {
+                "model": "auto",
+                "messages": [{"role": "user", "content": "hello"}],
+                "metadata": {
+                    "headers": {
+                        "x-bsnexus-task-type": "test",
+                        "x-bsnexus-complexity-hint": raw_value,
+                    }
+                },
+            }
+            result = await router.async_pre_call_hook(MagicMock(), MagicMock(), data, "completion")
+            nexus = result["metadata"]["routing_decision"]["nexus_metadata"]
+            assert nexus is not None
+            assert nexus["complexity_hint"] == expected, (
+                f"complexity_hint={raw_value} should clamp to {expected}"
+            )
+
+    @pytest.mark.asyncio
     async def test_header_names_case_insensitive(self, router: BSGatewayRouter) -> None:
         data = {
             "model": "auto",

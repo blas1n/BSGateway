@@ -168,7 +168,7 @@ def _extract_nexus_metadata(data: dict) -> NexusMetadata | None:
     hint_raw = normalized.get("x-bsnexus-complexity-hint")
     if hint_raw is not None:
         try:
-            complexity_hint = int(hint_raw)
+            complexity_hint = max(0, min(100, int(hint_raw)))
         except (ValueError, TypeError):
             pass
 
