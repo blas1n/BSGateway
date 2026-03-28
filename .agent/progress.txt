@@ -30,3 +30,17 @@ Completed: 2026-03-28
 
 ### Results
 - 504 tests pass, 97% coverage, ruff clean
+
+## TASK-003: Add BSNexus metadata columns to routing_logs
+**Date**: 2026-03-28
+**Status**: DONE
+
+### Changes
+- `schema.sql`: Added 4 columns — nexus_task_type TEXT, nexus_priority TEXT, nexus_complexity_hint INTEGER, decision_source TEXT
+- `queries.sql`: Updated `insert_routing_log` from 14 to 18 params ($15-$18 = new nexus fields)
+- `collector.py`: `record()` now extracts NexusMetadata fields from `decision.nexus_metadata` and passes `decision.decision_source`
+- `test_collector.py`: Added `TestNexusMetadataRecording` with 4 tests covering all scenarios
+
+### Test Results
+- 508 tests pass, 97% coverage (was already 97%)
+- ruff clean

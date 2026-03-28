@@ -22,7 +22,7 @@
       "title": "Add BSNexus metadata columns to routing_logs",
       "description": "Add columns to bsgateway/routing/sql/schema.sql: nexus_task_type TEXT, nexus_priority TEXT, nexus_complexity_hint INTEGER, decision_source TEXT (values: 'classifier', 'hint', 'blend', 'priority_override'). Update insert queries in queries.sql. Update collector.py record() to save these fields. Write a migration script if needed. Write tests first.",
       "acceptanceCriteria": "Schema has new columns. Insert queries accept new params. Collector saves NexusMetadata fields. Tests verify collector records metadata correctly.",
-      "passes": false,
+      "passes": true,
       "priority": 3
     },
     {
