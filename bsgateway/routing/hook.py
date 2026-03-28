@@ -16,6 +16,7 @@ from bsgateway.routing.models import (
     CollectorConfig,
     EmbeddingConfig,
     LLMClassifierConfig,
+    NexusHeaderConfig,
     NexusMetadata,
     RoutingConfig,
     RoutingDecision,
@@ -149,7 +150,9 @@ def load_routing_config(config_path: str | None = None) -> RoutingConfig:
     )
 
 
-def _extract_nexus_metadata(data: dict) -> NexusMetadata | None:
+def _extract_nexus_metadata(
+    data: dict, header_config: NexusHeaderConfig | None = None
+) -> NexusMetadata | None:
     """Extract X-BSNexus-* headers from request data into a NexusMetadata object.
 
     Returns None when no X-BSNexus-* headers are present (backward compatible).
@@ -159,13 +162,16 @@ def _extract_nexus_metadata(data: dict) -> NexusMetadata | None:
     if not headers:
         return None
 
+    if header_config is None:
+        header_config = NexusHeaderConfig()
+
     normalized = {k.lower(): v for k, v in headers.items()}
 
-    task_type: str | None = normalized.get("x-bsnexus-task-type")
-    priority: str | None = normalized.get("x-bsnexus-priority")
+    task_type: str | None = normalized.get(header_config.task_type)
+    priority: str | None = normalized.get(header_config.priority)
 
     complexity_hint: int | None = None
-    hint_raw = normalized.get("x-bsnexus-complexity-hint")
+    hint_raw = normalized.get(header_config.complexity_hint)
     if hint_raw is not None:
         try:
             complexity_hint = max(0, min(100, int(hint_raw)))
@@ -228,7 +234,7 @@ class BSGatewayRouter:
             return data
 
         requested_model = data.get("model", "auto")
-        nexus_metadata = _extract_nexus_metadata(data)
+        nexus_metadata = _extract_nexus_metadata(data, self.config.nexus_headers)
         decision = await self._route(requested_model, data, nexus_metadata)
 
         data["model"] = decision.resolved_model
