@@ -345,7 +345,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "bsvibe-auth", extras = ["fastapi"], git = "https://github.com/blas1n/BSVibe-Auth.git?subdirectory=python&rev=v0.2.0" },
+    { name = "bsvibe-auth", extras = ["fastapi"], git = "https://github.com/blas1n/BSVibe-Auth.git?subdirectory=python&rev=v0.4.0" },
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
@@ -365,7 +365,7 @@ provides-extras = ["dev"]
 [[package]]
 name = "bsvibe-auth"
 version = "0.1.0"
-source = { git = "https://github.com/blas1n/BSVibe-Auth.git?subdirectory=python&rev=v0.2.0#b4b80b29a1768c02b5603eb4dc872ed3013d1f8c" }
+source = { git = "https://github.com/blas1n/BSVibe-Auth.git?subdirectory=python&rev=v0.4.0#404cf28ed821f8c768c3980defc00e2455986d89" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },

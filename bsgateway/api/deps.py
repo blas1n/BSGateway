@@ -35,7 +35,7 @@ def get_cache(request: Request) -> CacheManager | None:
 
 @dataclass
 class AuthIdentity:
-    """Authenticated principal — either a Supabase user or an API key."""
+    """Authenticated principal — either a BSVibe user or an API key."""
 
     kind: Literal["user", "apikey"]
     id: str
@@ -53,11 +53,11 @@ class GatewayAuthContext:
 
 
 async def get_auth_context(request: Request) -> GatewayAuthContext:
-    """Authenticate via API key (bsg_live_*) or Supabase JWT.
+    """Authenticate via API key (bsg_live_*) or BSVibe JWT.
 
     1. Check Authorization header
     2. If token starts with "bsg_live_" → API key auth path
-    3. Otherwise → JWT auth path (existing)
+    3. Otherwise → JWT auth path (BSVibe Auth)
     4. Verify tenant is active
     5. Return GatewayAuthContext
     """
@@ -128,7 +128,7 @@ async def _auth_via_apikey(request: Request, raw_key: str) -> GatewayAuthContext
 
 
 async def _auth_via_jwt(request: Request, token: str) -> GatewayAuthContext:
-    """Authenticate using Supabase JWT (existing path)."""
+    """Authenticate using BSVibe JWT."""
     from bsvibe_auth import AuthError
 
     auth_provider = request.app.state.auth_provider
@@ -174,7 +174,7 @@ async def _auth_via_jwt(request: Request, token: str) -> GatewayAuthContext:
         )
 
     if not tenant_row:
-        # Auto-provision: Supabase org is source of truth
+        # Auto-provision: BSVibe auth is source of truth
         short_id = str(tenant_id)[:8]
         tenant_row = await repo.provision_tenant(
             tenant_id=tenant_id,
