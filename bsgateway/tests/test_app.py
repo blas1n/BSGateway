@@ -98,21 +98,6 @@ class TestLifespan:
             async with lifespan(app):
                 pass
 
-    async def test_raises_without_supabase_config(self):
-        app = MagicMock(spec=FastAPI)
-        app.state = MagicMock()
-
-        with (
-            patch("bsgateway.api.app.settings") as mock_settings,
-            pytest.raises(RuntimeError, match=r"SUPABASE_URL.*or SUPABASE_JWT_SECRET is required"),
-        ):
-            mock_settings.collector_database_url = "postgresql://test"
-            mock_settings.encryption_key_bytes = b"x" * 32
-            mock_settings.supabase_url = ""
-            mock_settings.supabase_jwt_secret = ""
-            async with lifespan(app):
-                pass
-
     async def test_lifespan_sets_state_and_cleans_up(self):
         app = MagicMock(spec=FastAPI)
         app.state = MagicMock()
@@ -132,12 +117,11 @@ class TestLifespan:
             patch("bsgateway.api.app.AuditRepository") as mock_audit_repo_cls,
             patch("bsgateway.apikey.repository.ApiKeyRepository") as mock_apikey_repo_cls,
             patch("bsgateway.api.app.CacheManager"),
-            patch("bsvibe_auth.SupabaseAuthProvider") as mock_auth_provider_cls,
+            patch("bsvibe_auth.BsvibeAuthProvider") as mock_auth_provider_cls,
         ):
             mock_settings.collector_database_url = "postgresql://test"
             mock_settings.encryption_key_bytes = b"x" * 32
-            mock_settings.supabase_url = "https://test.supabase.co"
-            mock_settings.supabase_jwt_secret = ""
+            mock_settings.bsvibe_auth_url = "https://auth.bsvibe.dev"
             mock_settings.redis_host = "localhost"
 
             # Each repo class returns a mock with async init_schema
@@ -177,11 +161,11 @@ class TestLifespan:
             patch("bsgateway.api.app.FeedbackRepository") as mock_feedback_repo_cls,
             patch("bsgateway.api.app.AuditRepository") as mock_audit_repo_cls,
             patch("bsgateway.apikey.repository.ApiKeyRepository") as mock_apikey_repo_cls,
-            patch("bsvibe_auth.SupabaseAuthProvider"),
+            patch("bsvibe_auth.BsvibeAuthProvider"),
         ):
             mock_settings.collector_database_url = "postgresql://test"
             mock_settings.encryption_key_bytes = b"x" * 32
-            mock_settings.supabase_jwt_secret = "test-supabase-secret"
+            mock_settings.bsvibe_auth_url = "https://auth.bsvibe.dev"
             mock_settings.redis_host = ""
 
             repo_classes = [

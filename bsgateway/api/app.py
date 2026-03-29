@@ -57,18 +57,9 @@ async def lifespan(app: FastAPI):
     encryption_key = settings.encryption_key_bytes
 
     # Initialize BSVibe-Auth provider
-    if not settings.supabase_url and not settings.supabase_jwt_secret:
-        raise RuntimeError(
-            "SUPABASE_URL (recommended) or SUPABASE_JWT_SECRET is required. "
-            "Set SUPABASE_URL to your project URL (e.g. https://xxx.supabase.co)."
-        )
+    from bsvibe_auth import BsvibeAuthProvider
 
-    from bsvibe_auth import SupabaseAuthProvider
-
-    app.state.auth_provider = SupabaseAuthProvider(
-        supabase_url=settings.supabase_url or None,
-        jwt_secret=settings.supabase_jwt_secret,
-    )
+    app.state.auth_provider = BsvibeAuthProvider(auth_url=settings.bsvibe_auth_url)
 
     pool = await get_pool(settings.collector_database_url)
     app.state.db_pool = pool
