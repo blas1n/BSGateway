@@ -175,7 +175,7 @@ def create_app() -> FastAPI:
     app.include_router(mcp_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
-    async def health() -> dict:
+    async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     # Serve frontend dashboard (only if build directory exists)

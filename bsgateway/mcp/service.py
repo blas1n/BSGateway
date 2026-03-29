@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 import asyncpg
@@ -147,7 +148,7 @@ class MCPService:
         tenant_id: UUID,
         name: str,
         provider: str,
-        config: dict,
+        config: dict[str, Any],
     ) -> MCPModelResponse:
         logger.info("mcp_register_model", tenant_id=str(tenant_id), name=name, provider=provider)
         litellm_model = config.get("litellm_model", f"{provider}/{name}")
