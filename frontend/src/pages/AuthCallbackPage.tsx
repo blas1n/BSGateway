@@ -9,7 +9,7 @@ export function AuthCallbackPage() {
     const user = auth.handleCallback();
     if (user) {
       // Force full reload to re-initialize auth state
-      window.location.href = '/dashboard/';
+      window.location.href = '/';
     } else {
       navigate('/', { replace: true });
     }

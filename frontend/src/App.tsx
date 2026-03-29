@@ -60,7 +60,7 @@ function App() {
   const { isAuthenticated, tenantId, tenantName, logout } = useAuth();
 
   return (
-    <BrowserRouter basename="/dashboard">
+    <BrowserRouter>
       <Routes>
         {/* Auth callback must be accessible regardless of auth state */}
         <Route path="auth/callback" element={<AuthCallbackPage />} />
