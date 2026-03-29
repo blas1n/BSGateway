@@ -102,7 +102,7 @@ async def test_create_rule():
     pool, conn = _make_pool_conn()
     tid = uuid4()
     rid = uuid4()
-    row = _rule_row(tenant_id=tid, rule_id=rid)
+    row = _rule_row(tenant_id=tid, rule_id=rid, name="my-rule")
     conn.fetchrow.side_effect = [row, _cond_row(rid)]
     conn.execute.return_value = None
     conn.fetch.return_value = [_cond_row(rid)]
@@ -116,7 +116,7 @@ async def test_create_rule():
         ],
         target_model="gpt-4o",
     )
-    assert result.name == "r1"
+    assert result.name == "my-rule"
     assert result.target_model == "gpt-4o"
 
 

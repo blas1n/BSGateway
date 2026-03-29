@@ -81,6 +81,9 @@ class MCPService:
         priority: int = 0,
         is_default: bool = False,
     ) -> MCPRuleResponse:
+        logger.info(
+            "mcp_create_rule", tenant_id=str(tenant_id), name=name, target_model=target_model
+        )
         row = await self._rules_repo.create_rule(
             tenant_id=tenant_id,
             name=name,
@@ -128,6 +131,7 @@ class MCPService:
         return self._to_rule_response(row, conds)
 
     async def delete_rule(self, rule_id: UUID, tenant_id: UUID) -> None:
+        logger.info("mcp_delete_rule", tenant_id=str(tenant_id), rule_id=str(rule_id))
         await self._rules_repo.delete_rule(rule_id, tenant_id)
 
     # -- Models --------------------------------------------------------------
@@ -143,6 +147,7 @@ class MCPService:
         provider: str,
         config: dict,
     ) -> MCPModelResponse:
+        logger.info("mcp_register_model", tenant_id=str(tenant_id), name=name, provider=provider)
         litellm_model = config.get("litellm_model", f"{provider}/{name}")
         api_base = config.get("api_base")
         extra_params = {k: v for k, v in config.items() if k not in ("litellm_model", "api_base")}
