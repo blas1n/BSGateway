@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Usage Page", () => {
+test.describe("API Keys Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/**", route => route.fulfill({status:200,contentType:"application/json",body:"[]"}));
     await page.goto("/");
@@ -12,9 +12,9 @@ test.describe("Usage Page", () => {
     await page.reload();
   });
 
-  test("navigates to usage page", async ({ page }) => {
+  test("navigates to api keys page", async ({ page }) => {
     await page.waitForTimeout(1000);
-    const link = page.getByRole("link", { name: /usage/i });
+    const link = page.getByRole("link", { name: /api.?keys/i });
     if (await link.isVisible()) {
       await link.click();
       await page.waitForTimeout(1000);
