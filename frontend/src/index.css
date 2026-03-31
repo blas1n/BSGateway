@@ -9,37 +9,42 @@
 
   body {
     margin: 0;
-    background-color: #0a0b0f;
-    color: #f2f3f7;
+    background-color: #121317;
+    color: #e3e2e8;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Scrollbar styling for dark theme */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #111218;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #2a2d42;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #3d4160;
+  /* Material Symbols configuration */
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
 
-  /* Form element base styles for dark theme */
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #121317;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #343439;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #f59e0b;
+  }
+
+  /* Form element base styles */
   input, textarea, select {
-    background-color: #111218;
-    border-color: #2a2d42;
-    color: #f2f3f7;
+    background-color: #1f1f24;
+    border-color: #534434;
+    color: #e3e2e8;
   }
   input::placeholder, textarea::placeholder {
-    color: #5a5f7d;
+    color: #534434;
   }
   input:focus, textarea:focus, select:focus {
     outline: none;
@@ -47,7 +52,13 @@
     box-shadow: 0 0 0 2px rgb(245 158 11 / 0.15);
   }
   select option {
-    background-color: #111218;
-    color: #f2f3f7;
+    background-color: #1f1f24;
+    color: #e3e2e8;
+  }
+}
+
+@layer utilities {
+  .ghost-border {
+    outline: 1px solid rgba(83, 68, 52, 0.15);
   }
 }

@@ -41,13 +41,21 @@ export function IntentsPage() {
   if (error) return <ErrorBanner message={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-50">Custom Intents</h2>
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h2 className="text-4xl font-extrabold tracking-tight text-on-surface mb-2">Custom Intents</h2>
+          <p className="text-on-surface-variant">Define intent patterns for semantic routing.</p>
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400"
+          className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 ${
+            showForm
+              ? 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
+              : 'bg-primary-container text-on-primary hover:brightness-110'
+          }`}
         >
+          <span className="material-symbols-outlined text-sm">{showForm ? 'close' : 'add_circle'}</span>
           {showForm ? 'Cancel' : 'New Intent'}
         </button>
       </div>
@@ -56,29 +64,29 @@ export function IntentsPage() {
       {deleteError && <ErrorBanner message={deleteError} onRetry={() => setDeleteError(null)} />}
 
       {showForm && (
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+        <div className="bg-surface-container-low rounded-2xl border border-primary/20 p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Name</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="summarization"
-              className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+              className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Requests asking to summarize content"
-              className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+              className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20 resize-none"
               rows={2}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Examples</label>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Examples</label>
             {formData.examples.map((ex, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <input
@@ -90,7 +98,7 @@ export function IntentsPage() {
                     setFormData({ ...formData, examples: newExamples });
                   }}
                   placeholder="e.g., 'Please summarize this...'"
-                  className="flex-1 border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+                  className="flex-1 bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
                 />
                 {formData.examples.length > 1 && (
                   <button
@@ -99,9 +107,9 @@ export function IntentsPage() {
                       const newExamples = formData.examples.filter((_, j) => j !== i);
                       setFormData({ ...formData, examples: newExamples });
                     }}
-                    className="text-red-400 hover:text-red-300"
+                    className="text-error hover:text-error/80 transition-colors"
                   >
-                    ✕
+                    <span className="material-symbols-outlined">close</span>
                   </button>
                 )}
               </div>
@@ -109,67 +117,72 @@ export function IntentsPage() {
             <button
               type="button"
               onClick={() => setFormData({ ...formData, examples: [...formData.examples, ''] })}
-              className="text-accent-500 text-sm hover:text-accent-400"
+              className="text-primary text-xs font-bold flex items-center gap-1 hover:text-primary/80"
             >
-              + Add Example
+              <span className="material-symbols-outlined text-sm">add</span> Add Example
             </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Target Model (optional)
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+              Target Model <span className="text-on-surface-variant/40 font-normal normal-case">(optional)</span>
             </label>
             <input
               type="text"
               value={formData.target_model}
               onChange={(e) => setFormData({ ...formData, target_model: e.target.value })}
               placeholder="gpt-4o"
-              className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+              className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
             />
           </div>
           <button
             onClick={handleCreate}
             disabled={submitting || !formData.name.trim() || formData.examples.every(e => !e.trim())}
-            className="bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400 disabled:opacity-50"
+            className="bg-primary-container text-on-primary px-6 py-3 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
           >
             {submitting ? 'Creating...' : 'Create Intent'}
           </button>
         </div>
       )}
 
-      <div className="bg-gray-900 rounded-lg border border-gray-700">
+      <div className="bg-surface-container-low rounded-2xl border border-outline-variant/5 overflow-hidden">
         {Array.isArray(intents) && intents.length > 0 ? (
-          <div className="divide-y divide-gray-800">
+          <div className="divide-y divide-outline-variant/5">
             {intents.map((intent) => (
-              <div key={intent.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors">
+              <div key={intent.id} className="p-6 flex items-center justify-between hover:bg-surface-container/30 transition-colors group">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-50">{intent.name}</span>
+                    <span className="font-semibold text-on-surface">{intent.name}</span>
                     {!intent.is_active && (
-                      <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
+                      <span className="text-[10px] bg-error/15 text-error px-2 py-0.5 rounded-full font-bold">
                         inactive
                       </span>
                     )}
                   </div>
                   {intent.description && (
-                    <p className="text-sm text-gray-500 mt-1">{intent.description}</p>
+                    <p className="text-sm text-on-surface-variant mt-1">{intent.description}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">threshold: {intent.threshold}</p>
+                  <p className="text-xs text-on-surface-variant/60 mt-1">threshold: {intent.threshold}</p>
                 </div>
                 <button
                   onClick={() => onDelete(intent.id, () => intentsApi.delete(tid, intent.id), refetch)}
-                  className={`text-sm ${
+                  className={`transition-colors opacity-0 group-hover:opacity-100 ${
                     deleting === intent.id
-                      ? 'text-white bg-red-600 px-3 py-1 rounded'
-                      : 'text-red-400 hover:text-red-300'
+                      ? 'text-error'
+                      : 'text-on-surface-variant hover:text-error'
                   }`}
                 >
-                  {deleting === intent.id ? 'Confirm?' : 'Delete'}
+                  <span className="material-symbols-outlined">
+                    {deleting === intent.id ? 'check_circle' : 'delete'}
+                  </span>
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No intents defined</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4">target</span>
+            <p className="text-sm text-on-surface-variant">No intents defined</p>
+          </div>
         )}
       </div>
     </div>

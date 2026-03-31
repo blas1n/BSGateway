@@ -39,58 +39,87 @@ export function ApiKeysPage() {
   if (error) return <ErrorBanner message={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-50">API Keys</h2>
+    <div className="p-8 max-w-6xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-on-surface mb-2">API Keys</h1>
+          <p className="text-on-surface-variant text-lg">Manage access keys for your applications.</p>
+        </div>
         <button
           onClick={() => { setShowForm(!showForm); setNewKey(null); }}
-          className="bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400"
+          className="flex items-center gap-2 bg-gradient-to-br from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-semibold shadow-lg shadow-primary/10 hover:brightness-110 active:scale-95 transition-all duration-200"
         >
-          {showForm ? 'Cancel' : 'Create API Key'}
+          <span className="material-symbols-outlined text-[20px]">add</span>
+          {showForm ? 'Cancel' : 'Generate New Key'}
         </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-surface-container-low p-6 rounded-xl border-l-4 border-amber-500 shadow-xl">
+          <span className="text-on-surface-variant text-xs font-bold tracking-widest uppercase mb-1 block">Active Keys</span>
+          <div className="text-3xl font-bold text-amber-500">
+            {keys?.filter(k => k.is_active).length ?? 0}
+          </div>
+        </div>
+        <div className="bg-surface-container-low p-6 rounded-xl border-l-4 border-outline-variant shadow-xl">
+          <span className="text-on-surface-variant text-xs font-bold tracking-widest uppercase mb-1 block">Total Keys</span>
+          <div className="text-3xl font-bold text-on-surface">{keys?.length ?? 0}</div>
+        </div>
+        <div className="bg-surface-container-low p-6 rounded-xl border-l-4 border-outline-variant shadow-xl">
+          <span className="text-on-surface-variant text-xs font-bold tracking-widest uppercase mb-1 block">Revoked</span>
+          <div className="text-3xl font-bold text-on-surface">
+            {keys?.filter(k => !k.is_active).length ?? 0}
+          </div>
+        </div>
       </div>
 
       {createError && <ErrorBanner message={createError} onRetry={() => setCreateError(null)} />}
 
+      {/* New Key Banner */}
       {newKey && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-          <p className="text-sm font-medium text-green-400 mb-2">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6">
+          <p className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-sm">check_circle</span>
             API Key created. Copy it now -- it won't be shown again.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-gray-50 select-all break-all">
+            <code className="flex-1 bg-surface-container-lowest border border-outline-variant/20 rounded-lg px-4 py-3 text-sm font-mono text-on-surface select-all break-all">
               {newKey}
             </code>
             <button
               onClick={() => { navigator.clipboard.writeText(newKey); }}
-              className="bg-accent-500 text-gray-950 px-3 py-2 rounded text-sm font-medium hover:bg-accent-400 shrink-0"
+              className="bg-primary-container text-on-primary px-4 py-3 rounded-lg text-sm font-bold hover:brightness-110 shrink-0 flex items-center gap-2"
             >
+              <span className="material-symbols-outlined text-sm">content_copy</span>
               Copy
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Usage: <code className="bg-gray-800 px-1 rounded text-gray-400">Authorization: Bearer {newKey.slice(0, 12)}...</code>
+          <p className="text-xs text-on-surface-variant mt-3">
+            Usage: <code className="bg-surface-container px-1.5 rounded text-on-surface-variant font-mono">Authorization: Bearer {newKey.slice(0, 12)}...</code>
           </p>
         </div>
       )}
 
+      {/* Create Form */}
       {showForm && !newKey && (
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Key Name</label>
+        <div className="bg-surface-container-low rounded-xl border border-outline-variant/10 p-6 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Key Name</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g. production, staging, ci-pipeline"
-              className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+              className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
             />
-            <p className="text-xs text-gray-500 mt-1">A label to identify this key</p>
+            <p className="text-[10px] text-on-surface-variant/60">A label to identify this key</p>
           </div>
           <button
             onClick={handleCreate}
             disabled={submitting || !formData.name.trim()}
-            className="bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400 disabled:opacity-50"
+            className="bg-primary-container text-on-primary px-6 py-3 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
           >
             {submitting ? 'Creating...' : 'Create Key'}
           </button>
@@ -99,54 +128,105 @@ export function ApiKeysPage() {
 
       {deleteError && <ErrorBanner message={deleteError} onRetry={() => setDeleteError(null)} />}
 
-      <div className="bg-gray-900 rounded-lg border border-gray-700">
+      {/* Keys Table */}
+      <div className="bg-surface-container rounded-xl overflow-hidden shadow-2xl border border-outline-variant/5">
         {keys && keys.length > 0 ? (
-          <div className="divide-y divide-gray-800">
-            {keys.map((key) => (
-              <div key={key.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-50">{key.name}</span>
-                    {!key.is_active && (
-                      <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded">
-                        revoked
-                      </span>
-                    )}
-                    {key.expires_at && new Date(key.expires_at) < new Date() && key.is_active && (
-                      <span className="text-xs bg-accent-500/15 text-accent-500 px-2 py-0.5 rounded">
-                        expired
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1 font-mono">{key.key_prefix}...</p>
-                  <div className="flex gap-4 text-xs text-gray-500 mt-1">
-                    <span>Created {new Date(key.created_at).toLocaleDateString()}</span>
-                    {key.last_used_at && (
-                      <span>Last used {new Date(key.last_used_at).toLocaleDateString()}</span>
-                    )}
-                    {key.expires_at && (
-                      <span>Expires {new Date(key.expires_at).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                </div>
-                {key.is_active && (
-                  <button
-                    onClick={() => onDelete(key.id, () => apiKeysApi.revoke(tid, key.id), refetch)}
-                    className={`text-sm shrink-0 ${
-                      deleting === key.id
-                        ? 'text-white bg-red-600 px-3 py-1 rounded'
-                        : 'text-red-400 hover:text-red-300'
-                    }`}
-                  >
-                    {deleting === key.id ? 'Confirm?' : 'Revoke'}
-                  </button>
-                )}
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-high">
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase">Name</th>
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase">Key</th>
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase">Created</th>
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase">Last Used</th>
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold tracking-widest text-on-surface-variant uppercase text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {keys.map((key) => {
+                  const isExpired = key.expires_at && new Date(key.expires_at) < new Date() && key.is_active;
+                  return (
+                    <tr key={key.id} className="group hover:bg-surface-bright/10 transition-colors duration-200">
+                      <td className="px-6 py-5 font-medium text-on-surface">{key.name}</td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2 font-mono text-sm text-on-surface-variant bg-surface-container-lowest px-2 py-1 rounded">
+                          {key.key_prefix}...
+                          <button
+                            onClick={() => navigator.clipboard.writeText(key.key_prefix)}
+                            className="material-symbols-outlined text-xs hover:text-amber-500 transition-colors"
+                          >
+                            content_copy
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">
+                        {new Date(key.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant">
+                        {key.last_used_at
+                          ? new Date(key.last_used_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : 'Never'}
+                      </td>
+                      <td className="px-6 py-5">
+                        {!key.is_active ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-surface-container-highest text-on-surface-variant border border-outline-variant/20">
+                            Revoked
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            Expired
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-green-500/10 text-green-500 border border-green-500/20">
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        {key.is_active && (
+                          <button
+                            onClick={() => onDelete(key.id, () => apiKeysApi.revoke(tid, key.id), refetch)}
+                            className={`transition-colors ${
+                              deleting === key.id
+                                ? 'text-error'
+                                : 'text-on-surface-variant hover:text-error'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              {deleting === key.id ? 'check_circle' : 'delete_forever'}
+                            </span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">No API keys created</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4">vpn_key</span>
+            <p className="text-sm text-on-surface-variant">No API keys created</p>
+          </div>
         )}
+      </div>
+
+      {/* Documentation Link */}
+      <div className="p-8 rounded-2xl bg-gradient-to-r from-surface-container to-surface-container-low border border-outline-variant/10 relative overflow-hidden group">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-500">auto_awesome</span>
+              Secure your API implementation
+            </h3>
+            <p className="text-on-surface-variant">
+              Learn about best practices for rotating keys, scoping permissions, and monitoring for unauthorized access.
+            </p>
+          </div>
+        </div>
+        <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 h-64 bg-amber-500/5 blur-[100px] pointer-events-none" />
       </div>
     </div>
   );

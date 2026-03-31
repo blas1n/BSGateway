@@ -10,7 +10,7 @@ import type { TenantModelCreate } from '../types/api';
 const INITIAL_MODEL: TenantModelCreate = { model_name: '', litellm_model: '' };
 
 const PROVIDER_COLORS: Record<string, string> = {
-  openai: 'bg-emerald-500/15 text-emerald-400',
+  openai: 'bg-green-500/15 text-green-400',
   anthropic: 'bg-violet-500/15 text-violet-400',
   google: 'bg-blue-500/15 text-blue-400',
   azure: 'bg-sky-500/15 text-sky-400',
@@ -20,7 +20,7 @@ const PROVIDER_COLORS: Record<string, string> = {
 
 function getProviderBadgeClass(litellmModel: string): string {
   const provider = litellmModel.split('/')[0].toLowerCase();
-  return PROVIDER_COLORS[provider] || 'bg-gray-700 text-gray-400';
+  return PROVIDER_COLORS[provider] || 'bg-secondary-container text-on-secondary-container';
 }
 
 export function ModelsPage() {
@@ -46,38 +46,26 @@ export function ModelsPage() {
   if (error) return <ErrorBanner message={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-50">Models Registry</h2>
-          <p className="text-gray-500 text-sm mt-0.5">
-            {models?.length ?? 0} model{models?.length !== 1 ? 's' : ''} registered
+          <h2 className="text-4xl font-extrabold tracking-tight text-on-surface mb-2">Model Registry</h2>
+          <p className="text-on-surface-variant max-w-2xl">
+            Manage and monitor deployment-ready LLMs across your distributed infrastructure.
+            {models && models.length > 0 && ` ${models.length} model${models.length !== 1 ? 's' : ''} registered.`}
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 ${
             showForm
-              ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              : 'bg-accent-500 text-gray-950 hover:bg-accent-400'
+              ? 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
+              : 'bg-primary-container text-on-primary hover:brightness-110'
           }`}
         >
-          {showForm ? (
-            <>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Cancel
-            </>
-          ) : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Register Model
-            </>
-          )}
+          <span className="material-symbols-outlined text-sm">{showForm ? 'close' : 'add_circle'}</span>
+          {showForm ? 'Cancel' : 'Register Model'}
         </button>
       </div>
 
@@ -85,63 +73,60 @@ export function ModelsPage() {
 
       {/* Create Form */}
       {showForm && (
-        <div className="bg-gray-900 rounded-xl border border-accent-500/30 p-6 space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-1 h-4 rounded-full bg-accent-500" />
-            <h3 className="text-sm font-semibold text-gray-50">Register New Model</h3>
-          </div>
+        <div className="bg-surface-container-low rounded-2xl border border-primary/20 p-8 space-y-6">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Register New Model</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Alias</label>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Alias</label>
               <input
                 type="text"
                 value={formData.model_name}
                 onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
                 placeholder="gpt-4o"
-                className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+                className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
               />
-              <p className="text-[11px] text-gray-600 mt-1">Internal alias for routing</p>
+              <p className="text-[10px] text-on-surface-variant/60">Internal alias for routing</p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">LiteLLM Model ID</label>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">LiteLLM Model ID</label>
               <input
                 type="text"
                 value={formData.litellm_model}
                 onChange={(e) => setFormData({ ...formData, litellm_model: e.target.value })}
                 placeholder="openai/gpt-4o"
-                className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono bg-gray-900"
+                className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
               />
-              <p className="text-[11px] text-gray-600 mt-1">provider/model format</p>
+              <p className="text-[10px] text-on-surface-variant/60">provider/model format</p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                API Base <span className="text-gray-600 font-normal">(optional)</span>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                API Base <span className="text-on-surface-variant/40 font-normal normal-case">(optional)</span>
               </label>
               <input
                 type="text"
                 value={formData.api_base || ''}
                 onChange={(e) => setFormData({ ...formData, api_base: e.target.value || undefined })}
                 placeholder="http://localhost:11434"
-                className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono bg-gray-900"
+                className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                API Key <span className="text-gray-600 font-normal">(optional)</span>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                API Key <span className="text-on-surface-variant/40 font-normal normal-case">(optional)</span>
               </label>
               <input
                 type="password"
                 value={formData.api_key || ''}
                 onChange={(e) => setFormData({ ...formData, api_key: e.target.value || undefined })}
                 placeholder="sk-..."
-                className="w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900"
+                className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/20"
               />
             </div>
           </div>
           <button
             onClick={handleCreate}
             disabled={submitting || !formData.model_name.trim() || !formData.litellm_model.trim()}
-            className="bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400 disabled:opacity-50 transition-colors"
+            className="bg-primary-container text-on-primary px-6 py-3 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
           >
             {submitting ? 'Registering...' : 'Register Model'}
           </button>
@@ -152,74 +137,77 @@ export function ModelsPage() {
 
       {/* Models Grid */}
       {models && models.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {models.map((model) => {
             const provider = model.litellm_model.split('/')[0];
             const modelId = model.litellm_model.split('/').slice(1).join('/');
             return (
               <div
                 key={model.id}
-                className="bg-gray-900 rounded-xl border border-gray-700 p-5 hover:border-gray-600 transition-colors group"
+                className={`bg-surface-container rounded-xl p-6 hover:bg-surface-container-high transition-colors group cursor-pointer border border-outline-variant/10 ${
+                  !model.is_active ? 'opacity-60' : ''
+                }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-400">
-                        <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round"/>
-                        <circle cx="7" cy="7" r="2" fill="currentColor" opacity="0.7"/>
-                      </svg>
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-bold">{model.model_name}</h3>
+                      <div className={`w-2 h-2 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-slate-600'}`} />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-50 text-sm truncate">{model.model_name}</p>
-                      {!model.is_active && (
-                        <span className="text-[10px] text-red-400">inactive</span>
-                      )}
+                    <div className="flex gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getProviderBadgeClass(model.litellm_model)}`}>
+                        {provider}
+                      </span>
                     </div>
                   </div>
                   <button
                     onClick={() => onDelete(model.id, () => tenantsApi.deleteModel(tid, model.id), refetch)}
-                    className={`text-xs px-2 py-0.5 rounded shrink-0 ml-2 transition-colors ${
+                    className={`transition-colors ${
                       deleting === model.id
-                        ? 'text-white bg-red-600'
-                        : 'text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100'
+                        ? 'text-error'
+                        : 'text-slate-500 group-hover:text-amber-500 opacity-0 group-hover:opacity-100'
                     }`}
                   >
-                    {deleting === model.id ? 'Confirm?' : 'Delete'}
+                    <span className="material-symbols-outlined">
+                      {deleting === model.id ? 'check_circle' : 'more_vert'}
+                    </span>
                   </button>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${getProviderBadgeClass(model.litellm_model)}`}>
-                      {provider}
-                    </span>
-                    {modelId && (
-                      <span className="font-mono text-xs text-gray-500 truncate">{modelId}</span>
-                    )}
-                  </div>
-                  {model.api_base && (
-                    <p className="text-[11px] text-gray-600 font-mono truncate" title={model.api_base}>
-                      {model.api_base}
-                    </p>
-                  )}
+                <div className="mb-6">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Model ID</p>
+                  <p className="text-on-surface font-mono text-sm">{modelId || model.litellm_model}</p>
+                </div>
+                {model.api_base && (
+                  <p className="text-[10px] text-on-surface-variant font-mono truncate" title={model.api_base}>
+                    {model.api_base}
+                  </p>
+                )}
+                {/* Sparkline placeholder */}
+                <div className="h-16 w-full flex items-end gap-1 mt-4">
+                  {[40, 55, 50, 70, 65, 80, 75].map((h, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 rounded-t transition-colors ${
+                        model.is_active
+                          ? i >= 5 ? 'bg-amber-500' : i >= 4 ? 'bg-amber-500/40' : 'bg-amber-500/20'
+                          : i >= 5 ? 'bg-slate-500' : i >= 4 ? 'bg-slate-500/40' : 'bg-slate-500/20'
+                      }`}
+                      style={{ height: `${h}%` }}
+                    />
+                  ))}
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="bg-gray-900 rounded-xl border border-gray-700 flex flex-col items-center justify-center py-16">
-          <div className="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center mb-4">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-600">
-              <path d="M10 2L18 6.5V13.5L10 18L2 13.5V6.5L10 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              <circle cx="10" cy="10" r="3" fill="currentColor" opacity="0.5"/>
-            </svg>
-          </div>
-          <p className="text-sm text-gray-500 font-medium">No models registered</p>
-          <p className="text-xs text-gray-600 mt-1">Add a model to start routing</p>
+        <div className="bg-surface-container-low rounded-2xl border border-outline-variant/5 flex flex-col items-center justify-center py-16">
+          <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4">category</span>
+          <p className="text-sm text-on-surface-variant font-medium">No models registered</p>
+          <p className="text-xs text-on-surface-variant/60 mt-1">Add a model to start routing</p>
           <button
             onClick={() => setShowForm(true)}
-            className="mt-4 bg-accent-500 text-gray-950 px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-400 transition-colors"
+            className="mt-4 bg-primary-container text-on-primary px-6 py-3 rounded-xl font-bold hover:brightness-110 transition-all"
           >
             Register First Model
           </button>

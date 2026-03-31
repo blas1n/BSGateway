@@ -9,9 +9,9 @@ interface LayoutProps {
 
 export function Layout({ onLogout, tenantSlug, tenantName }: LayoutProps) {
   return (
-    <div className="flex min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-surface text-on-surface antialiased">
       <Sidebar onLogout={onLogout} tenantSlug={tenantSlug} tenantName={tenantName} />
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="ml-64 min-h-screen">
         <Outlet />
       </main>
     </div>
