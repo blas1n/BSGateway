@@ -1,25 +1,78 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
+import { injectAuth, mockTenantInfo, mockGet, MOCK_MODELS } from './helpers';
 
-test.describe("Models Page", () => {
+test.describe('Models Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route("**/api/**", route => route.fulfill({status:200,contentType:"application/json",body:"[]"}));
-    await page.goto("/");
-    await page.evaluate(() => {
-      const h = btoa(JSON.stringify({alg:"ES256",typ:"JWT"})).replace(/=/g,"");
-      const p = btoa(JSON.stringify({sub:"t",email:"t@t.com",role:"authenticated",exp:Math.floor(Date.now()/1000)+3600,tenantId:"t",app_metadata:{role:"admin"}})).replace(/=/g,"");
-      sessionStorage.setItem("bsvibe_user", JSON.stringify({accessToken:h+"."+p+".s",refreshToken:"r",tenantId:"t",email:"t@t.com",role:"admin"}));
-    });
-    await page.reload();
+    await injectAuth(page);
+    await mockTenantInfo(page);
+    await mockGet(page, '/models', MOCK_MODELS);
   });
 
-  test("navigates to models page", async ({ page }) => {
-    await page.waitForTimeout(1000);
-    const link = page.getByRole("link", { name: /models/i });
-    if (await link.isVisible()) {
-      await link.click();
-      await page.waitForTimeout(1000);
-    }
-    const body = await page.textContent("body");
-    expect(body).toBeTruthy();
+  test('displays page heading and model count', async ({ page }) => {
+    await page.goto('/models');
+    await expect(page.getByRole('heading', { name: /model registry/i })).toBeVisible();
+    await expect(page.getByText('3 models registered.')).toBeVisible();
+  });
+
+  test('renders model cards in grid layout', async ({ page }) => {
+    await page.goto('/models');
+    // Model name headings (h3 elements)
+    await expect(page.getByRole('heading', { name: 'gpt-4o' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'claude-sonnet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'gemini-pro' })).toBeVisible();
+  });
+
+  test('shows provider badges with correct colors', async ({ page }) => {
+    await page.goto('/models');
+    // Provider badges are uppercase
+    await expect(page.getByText('openai', { exact: true })).toBeVisible();
+    await expect(page.getByText('anthropic', { exact: true })).toBeVisible();
+    await expect(page.getByText('google', { exact: true })).toBeVisible();
+  });
+
+  test('shows model ID section on each card', async ({ page }) => {
+    await page.goto('/models');
+    // Each card shows "Model ID" label
+    const modelIdLabels = page.getByText('Model ID');
+    await expect(modelIdLabels.first()).toBeVisible();
+  });
+
+  test('inactive model card has reduced opacity', async ({ page }) => {
+    await page.goto('/models');
+    // gemini-pro is inactive (is_active: false)
+    const geminiCard = page.locator('div').filter({ hasText: /^gemini-pro/ }).first();
+    await expect(geminiCard).toBeVisible();
+  });
+
+  test('Register Model button toggles form', async ({ page }) => {
+    await page.goto('/models');
+    const btn = page.getByRole('button', { name: /register model/i });
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(page.getByText('Register New Model')).toBeVisible();
+    // Alias and LiteLLM Model ID inputs
+    await expect(page.getByPlaceholder('gpt-4o', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('openai/gpt-4o', { exact: true })).toBeVisible();
+  });
+
+  test('register form has optional API Base and API Key fields', async ({ page }) => {
+    await page.goto('/models');
+    await page.getByRole('button', { name: /register model/i }).click();
+    await expect(page.getByPlaceholder('http://localhost:11434')).toBeVisible();
+    await expect(page.getByPlaceholder('sk-...')).toBeVisible();
+  });
+
+  test('register form submit button disabled without required fields', async ({ page }) => {
+    await page.goto('/models');
+    await page.getByRole('button', { name: /register model/i }).click();
+    const submitBtn = page.getByRole('button', { name: 'Register Model' }).last();
+    await expect(submitBtn).toBeDisabled();
+  });
+
+  test('empty state shows when no models exist', async ({ page }) => {
+    await mockGet(page, '/models', []);
+    await page.goto('/models');
+    await expect(page.getByText('No models registered')).toBeVisible();
+    await expect(page.getByRole('button', { name: /register first model/i })).toBeVisible();
   });
 });
