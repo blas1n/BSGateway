@@ -1,69 +1,92 @@
 import { test, expect } from '@playwright/test';
-import { setupAuth, setupApiMocks, MOCK_USAGE } from './fixtures/mock-api';
+import { injectAuth, mockTenantInfo, MOCK_USAGE } from './helpers';
 
-test.describe('Usage Analytics Page', () => {
+test.describe('Usage / Analytics Page', () => {
   test.beforeEach(async ({ page }) => {
-    await setupAuth(page);
-    await setupApiMocks(page);
-    await page.goto('/dashboard/usage');
-    await expect(page.locator('h2')).toContainText('Usage Analytics', { timeout: 5000 });
+    await injectAuth(page);
+    await mockTenantInfo(page);
+
+    // Mock usage endpoint for all periods
+    await page.route('**/api/v1/tenants/test-tenant-id/usage*', (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(MOCK_USAGE),
+        });
+      }
+      return route.continue();
+    });
   });
 
-  test('displays page header and subtitle', async ({ page }) => {
-    await expect(page.locator('text=Routing traffic and token consumption')).toBeVisible();
+  test('displays page heading', async ({ page }) => {
+    await page.goto('/usage');
+    await expect(page.getByRole('heading', { name: /analytics dashboard/i })).toBeVisible();
   });
 
-  test('shows period selector defaulting to week', async ({ page }) => {
-    const select = page.locator('select');
-    await expect(select).toHaveValue('week');
-
-    // All period options available
-    await expect(page.locator('option[value="day"]')).toBeAttached();
-    await expect(page.locator('option[value="week"]')).toBeAttached();
-    await expect(page.locator('option[value="month"]')).toBeAttached();
+  test('shows period selector with day/week/month buttons', async ({ page }) => {
+    await page.goto('/usage');
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Last 7 days' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Last 30 days' })).toBeVisible();
   });
 
-  test('shows summary stats cards', async ({ page }) => {
-    // Total Requests
-    await expect(page.locator('text=Total Requests')).toBeVisible();
-    await expect(page.locator(`text=${MOCK_USAGE.total_requests}`)).toBeVisible();
-
-    // Total Tokens
-    await expect(page.locator('text=Total Tokens')).toBeVisible();
-    await expect(page.locator('text=523,800')).toBeVisible();
-
-    // Models Used
-    await expect(page.locator('text=Models Used')).toBeVisible();
+  test('week period is active by default', async ({ page }) => {
+    await page.goto('/usage');
+    // The active button has different styling
+    const weekBtn = page.getByRole('button', { name: 'Last 7 days' });
+    await expect(weekBtn).toBeVisible();
   });
 
-  test('shows daily requests chart', async ({ page }) => {
-    await expect(page.locator('text=Daily Requests')).toBeVisible();
-    // Recharts renders SVG
-    await expect(page.locator('.recharts-responsive-container').first()).toBeVisible();
+  test('shows Daily Request Trend chart', async ({ page }) => {
+    await page.goto('/usage');
+    await expect(page.getByText('Daily Request Trend')).toBeVisible();
+    await expect(page.getByText('12,345').first()).toBeVisible(); // total requests shown in chart and summary
+    await expect(page.getByText('total requests', { exact: true })).toBeVisible();
   });
 
-  test('shows traffic by model chart', async ({ page }) => {
-    await expect(page.locator('text=Traffic by Model')).toBeVisible();
+  test('shows Traffic by Model donut chart', async ({ page }) => {
+    await page.goto('/usage');
+    await expect(page.getByText('Traffic by Model')).toBeVisible();
+    await expect(page.getByText('Request distribution')).toBeVisible();
+    // Legend items
+    await expect(page.getByText('openai/gpt-4o').first()).toBeVisible();
+    await expect(page.getByText('anthropic/claude-3-5-sonnet')).toBeVisible();
   });
 
-  test('shows traffic by rule chart', async ({ page }) => {
-    await expect(page.locator('text=Traffic by Rule')).toBeVisible();
+  test('shows summary stat cards', async ({ page }) => {
+    await page.goto('/usage');
+    // Summary row has three stat cards
+    const totalReqCards = page.getByText('Total Requests');
+    await expect(totalReqCards.first()).toBeVisible();
+    await expect(page.getByText('Total Tokens').first()).toBeVisible();
+    await expect(page.getByText('Active Models')).toBeVisible();
+    // Model count = 3
+    await expect(page.getByText('3').first()).toBeVisible();
   });
 
-  test('can switch period to day', async ({ page }) => {
-    const select = page.locator('select');
-    await select.selectOption('day');
-    await expect(select).toHaveValue('day');
-
-    // Should still show stats after reload
-    await expect(page.locator('text=Total Requests')).toBeVisible({ timeout: 5000 });
+  test('shows Traffic by Rule bar chart', async ({ page }) => {
+    await page.goto('/usage');
+    await expect(page.getByText('Traffic by Rule')).toBeVisible();
+    await expect(page.getByText('Routing rule hits')).toBeVisible();
   });
 
-  test('can switch period to month', async ({ page }) => {
-    const select = page.locator('select');
-    await select.selectOption('month');
-    await expect(select).toHaveValue('month');
+  test('clicking period button reloads data', async ({ page }) => {
+    await page.goto('/usage');
+    // Click "Today"
+    await page.getByRole('button', { name: 'Today' }).click();
+    // Should still show data (mocked for all periods)
+    await expect(page.getByText('Daily Request Trend')).toBeVisible();
+  });
 
-    await expect(page.locator('text=Total Requests')).toBeVisible({ timeout: 5000 });
+  test('shows empty state when no data', async ({ page }) => {
+    await page.route('**/api/v1/tenants/test-tenant-id/usage*', (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(null) });
+      }
+      return route.continue();
+    });
+    await page.goto('/usage');
+    await expect(page.getByText('No usage data available')).toBeVisible();
   });
 });

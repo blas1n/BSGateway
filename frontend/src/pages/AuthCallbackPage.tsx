@@ -9,14 +9,14 @@ export function AuthCallbackPage() {
     const user = auth.handleCallback();
     if (user) {
       // Force full reload to re-initialize auth state
-      window.location.href = '/dashboard/';
+      window.location.href = '/';
     } else {
       navigate('/', { replace: true });
     }
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
       <p className="text-gray-500">Signing in...</p>
     </div>
   );

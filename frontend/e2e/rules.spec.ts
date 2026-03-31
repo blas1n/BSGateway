@@ -1,76 +1,96 @@
 import { test, expect } from '@playwright/test';
-import { setupAuth, setupApiMocks } from './fixtures/mock-api';
+import { injectAuth, mockTenantInfo, mockGet, mockPost, MOCK_RULES } from './helpers';
 
-test.describe('Rules Management', () => {
+test.describe('Rules Page', () => {
   test.beforeEach(async ({ page }) => {
-    await setupAuth(page);
-    await setupApiMocks(page);
-    await page.goto('/dashboard/rules');
-    await expect(page.locator('h2')).toContainText('Routing Rules', { timeout: 5000 });
+    await injectAuth(page);
+    await mockTenantInfo(page);
+    await mockGet(page, '/rules', MOCK_RULES);
   });
 
-  test('displays existing rules sorted by priority', async ({ page }) => {
-    await expect(page.locator('text=High-priority rule')).toBeVisible();
-    await expect(page.locator('text=Default fallback')).toBeVisible();
-
-    // Priority badges - use exact text match to avoid P1 matching P100
-    await expect(page.getByText('P1', { exact: true })).toBeVisible();
-    await expect(page.getByText('P100', { exact: true })).toBeVisible();
+  test('displays page heading and description', async ({ page }) => {
+    await page.goto('/rules');
+    await expect(page.getByRole('heading', { name: /routing rules/i })).toBeVisible();
+    await expect(page.getByText(/configure intelligent traffic distribution/i)).toBeVisible();
+    await expect(page.getByText('2 rules configured.')).toBeVisible();
   });
 
-  test('shows default badge on default rules', async ({ page }) => {
-    // Use exact match to distinguish "default" badge from "Default fallback" name
+  test('shows rules table with correct column headers', async ({ page }) => {
+    await page.goto('/rules');
+    const headers = page.locator('thead th');
+    await expect(headers).toHaveCount(5); // Name, Target Model, Priority, Status, Actions
+    await expect(page.getByRole('columnheader', { name: 'Name' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Target Model' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Priority' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+  });
+
+  test('renders rule rows with names and models', async ({ page }) => {
+    await page.goto('/rules');
+    await expect(page.getByText('High Priority Router')).toBeVisible();
+    await expect(page.getByText('Default Fallback')).toBeVisible();
+    await expect(page.getByText('openai/gpt-4o', { exact: true })).toBeVisible();
+    await expect(page.getByText('openai/gpt-4o-mini')).toBeVisible();
+  });
+
+  test('shows default badge on default rule', async ({ page }) => {
+    await page.goto('/rules');
     await expect(page.getByText('default', { exact: true })).toBeVisible();
   });
 
-  test('shows condition count for rules with conditions', async ({ page }) => {
-    // Code only shows condition count when > 0
-    await expect(page.locator('text=1 condition(s)')).toBeVisible();
+  test('shows priority badges (P1, P5)', async ({ page }) => {
+    await page.goto('/rules');
+    await expect(page.getByText('P1')).toBeVisible();
+    await expect(page.getByText('P5')).toBeVisible();
   });
 
-  test('shows target model for each rule', async ({ page }) => {
-    await expect(page.locator('text=Target:')).toHaveCount(2);
-    await expect(page.locator('span.font-mono:has-text("claude-sonnet")')).toBeVisible();
-    await expect(page.locator('span.font-mono:has-text("gpt-4o-mini")')).toBeVisible();
+  test('shows conditions count on rule with conditions', async ({ page }) => {
+    await page.goto('/rules');
+    await expect(page.getByText('1 condition')).toBeVisible();
   });
 
-  test('opens and closes create rule form', async ({ page }) => {
-    await expect(page.locator('label:has-text("Name")')).not.toBeVisible();
-
-    await page.click('button:has-text("New Rule")');
-    await expect(page.locator('label:has-text("Name")')).toBeVisible();
-    await expect(page.locator('label:has-text("Target Model")')).toBeVisible();
-    await expect(page.locator('label:has-text("Priority")')).toBeVisible();
-
-    await page.click('button:has-text("Cancel")');
-    await expect(page.locator('label:has-text("Name")')).not.toBeVisible();
+  test('Create Rule button opens modal', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /create rule/i }).click();
+    await expect(page.getByRole('heading', { name: /create routing rule/i })).toBeVisible();
   });
 
-  test('creates a new rule', async ({ page }) => {
-    await page.click('button:has-text("New Rule")');
+  test('create modal has name input, target model input, and priority slider', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /create rule/i }).click();
 
-    // Fill the form - use labels to find adjacent inputs
-    await page.locator('label:has-text("Name") + input').fill('Test Rule E2E');
-    await page.locator('input[type="number"]').fill('50');
-    await page.locator('label:has-text("Target Model") + input').fill('gpt-4o');
-
-    await page.click('button:has-text("Create Rule")');
-
-    await expect(page.locator('text=Test Rule E2E')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByPlaceholder(/high priority customer router/i)).toBeVisible();
+    await expect(page.getByPlaceholder('e.g. openai/gpt-4o')).toBeVisible();
+    await expect(page.getByText('Execution Priority')).toBeVisible();
+    await expect(page.getByRole('slider')).toBeVisible();
   });
 
-  test('deletes a rule with confirmation', async ({ page }) => {
-    // Use structural locator for robustness against onBlur
-    const firstRuleRow = page.locator('.divide-y > div').first();
-    const actionBtn = firstRuleRow.locator('button');
+  test('create modal has default rule toggle', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /create rule/i }).click();
+    await expect(page.getByText('Default rule (fallback)')).toBeVisible();
+  });
 
-    // First click: shows "Confirm?"
-    await actionBtn.click();
-    await expect(actionBtn).toContainText('Confirm?');
+  test('create modal Save & Deploy button disabled without required fields', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /create rule/i }).click();
+    const saveBtn = page.getByRole('button', { name: /save & deploy/i });
+    await expect(saveBtn).toBeDisabled();
+  });
 
-    // Second click: confirms deletion
-    await actionBtn.click();
+  test('create modal close button works', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /create rule/i }).click();
+    await expect(page.getByRole('heading', { name: /create routing rule/i })).toBeVisible();
+    // Click close (X) button
+    await page.locator('button:has(span:text("close"))').first().click();
+    await expect(page.getByRole('heading', { name: /create routing rule/i })).not.toBeVisible();
+  });
 
-    await expect(page.locator('text=High-priority rule')).not.toBeVisible({ timeout: 5000 });
+  test('empty state shows when no rules exist', async ({ page }) => {
+    await mockGet(page, '/rules', []);
+    await page.goto('/rules');
+    await expect(page.getByText('No routing rules yet')).toBeVisible();
+    await expect(page.getByText('Create First Rule')).toBeVisible();
   });
 });

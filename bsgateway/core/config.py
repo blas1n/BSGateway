@@ -22,9 +22,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_host: str = "0.0.0.0"
 
-    # Auth (Supabase JWT)
-    supabase_url: str = ""
-    supabase_jwt_secret: str = ""  # HS256 fallback (legacy)
+    # Auth (BSVibe-Auth)
+    bsvibe_auth_url: str = "https://auth.bsvibe.dev"
     encryption_key: str = ""  # 32-byte hex string for AES-256-GCM
 
     # CORS (comma-separated list of allowed origins, e.g. "http://localhost:5173,https://app.example.com")

@@ -7,7 +7,7 @@ const TENANT_NAME_KEY = 'bsvibe_tenant_name';
 
 const auth = new BSVibeAuth({
   authUrl: AUTH_URL,
-  callbackPath: '/dashboard/auth/callback',
+  callbackPath: '/auth/callback',
 });
 
 interface AuthState {

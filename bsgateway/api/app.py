@@ -57,18 +57,9 @@ async def lifespan(app: FastAPI):
     encryption_key = settings.encryption_key_bytes
 
     # Initialize BSVibe-Auth provider
-    if not settings.supabase_url and not settings.supabase_jwt_secret:
-        raise RuntimeError(
-            "SUPABASE_URL (recommended) or SUPABASE_JWT_SECRET is required. "
-            "Set SUPABASE_URL to your project URL (e.g. https://xxx.supabase.co)."
-        )
+    from bsvibe_auth import BsvibeAuthProvider
 
-    from bsvibe_auth import SupabaseAuthProvider
-
-    app.state.auth_provider = SupabaseAuthProvider(
-        supabase_url=settings.supabase_url or None,
-        jwt_secret=settings.supabase_jwt_secret,
-    )
+    app.state.auth_provider = BsvibeAuthProvider(auth_url=settings.bsvibe_auth_url)
 
     pool = await get_pool(settings.collector_database_url)
     app.state.db_pool = pool
@@ -170,6 +161,7 @@ def create_app() -> FastAPI:
     from bsgateway.api.routers.rules import router as rules_router
     from bsgateway.api.routers.tenants import router as tenants_router
     from bsgateway.api.routers.usage import router as usage_router
+    from bsgateway.mcp.router import router as mcp_router
 
     app.include_router(chat_router, prefix="/api/v1")
     app.include_router(tenants_router, prefix="/api/v1")
@@ -180,9 +172,10 @@ def create_app() -> FastAPI:
     app.include_router(usage_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(apikeys_router, prefix="/api/v1")
+    app.include_router(mcp_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
-    async def health() -> dict:
+    async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     # Serve frontend dashboard (only if build directory exists)
