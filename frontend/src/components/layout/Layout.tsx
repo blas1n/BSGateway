@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { HelpButton } from '../help/HelpButton';
 
 interface LayoutProps {
   onLogout?: () => void;
@@ -14,6 +15,7 @@ export function Layout({ onLogout, tenantSlug, tenantName }: LayoutProps) {
       <main className="ml-64 min-h-screen">
         <Outlet />
       </main>
+      <HelpButton />
     </div>
   );
 }

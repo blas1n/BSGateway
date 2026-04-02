@@ -1,0 +1,66 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "rules": "Routing Rules",
+    "models": "Models",
+    "routingTest": "Routing Test",
+    "usage": "Usage",
+    "apiKeys": "API Keys",
+    "audit": "Audit Log",
+    "intents": "Intents",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "noData": "No data available",
+    "confirm": "Confirm"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalRequests": "Total Requests",
+    "totalTokens": "Total Tokens",
+    "totalCost": "Total Cost",
+    "avgLatency": "Avg Latency"
+  },
+  "rules": {
+    "title": "Routing Rules",
+    "addRule": "Add Rule",
+    "editRule": "Edit Rule",
+    "deleteRule": "Delete Rule",
+    "pattern": "Pattern",
+    "model": "Model",
+    "priority": "Priority"
+  },
+  "apiKeys": {
+    "title": "API Key Management",
+    "createKey": "Create Key",
+    "name": "Name",
+    "project": "Project",
+    "rateLimit": "Rate Limit",
+    "expiry": "Expiry",
+    "revoke": "Revoke"
+  },
+  "usage": {
+    "title": "Usage",
+    "period": "Period",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month",
+    "custom": "Custom",
+    "byModel": "By Model",
+    "byCost": "By Cost"
+  },
+  "help": {
+    "button": "Help",
+    "close": "Close",
+    "viewDocs": "View Docs"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "nav": {
+    "dashboard": "대시보드",
+    "rules": "라우팅 규칙",
+    "models": "모델",
+    "routingTest": "라우팅 테스트",
+    "usage": "사용량",
+    "apiKeys": "API 키",
+    "audit": "감사 로그",
+    "intents": "인텐트",
+    "settings": "설정",
+    "logout": "로그아웃"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "edit": "수정",
+    "create": "생성",
+    "search": "검색",
+    "loading": "로딩 중...",
+    "error": "오류가 발생했습니다",
+    "noData": "데이터가 없습니다",
+    "confirm": "확인"
+  },
+  "dashboard": {
+    "title": "대시보드",
+    "totalRequests": "총 요청 수",
+    "totalTokens": "총 토큰 수",
+    "totalCost": "총 비용",
+    "avgLatency": "평균 응답 시간"
+  },
+  "rules": {
+    "title": "라우팅 규칙",
+    "addRule": "규칙 추가",
+    "editRule": "규칙 수정",
+    "deleteRule": "규칙 삭제",
+    "pattern": "패턴",
+    "model": "모델",
+    "priority": "우선순위"
+  },
+  "apiKeys": {
+    "title": "API 키 관리",
+    "createKey": "키 생성",
+    "name": "이름",
+    "project": "프로젝트",
+    "rateLimit": "속도 제한",
+    "expiry": "만료일",
+    "revoke": "폐기"
+  },
+  "usage": {
+    "title": "사용량",
+    "period": "기간",
+    "today": "오늘",
+    "week": "이번 주",
+    "month": "이번 달",
+    "custom": "직접 설정",
+    "byModel": "모델별",
+    "byCost": "비용별"
+  },
+  "help": {
+    "button": "도움말",
+    "close": "닫기",
+    "viewDocs": "문서 보기"
+  }
+}

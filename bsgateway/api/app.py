@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from bsgateway.audit.repository import AuditRepository
@@ -177,6 +178,42 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/health/ready", tags=["health"])
+    async def health_ready() -> JSONResponse:
+        """Deep health check: verify database and Redis connectivity."""
+        checks: dict[str, str] = {}
+        all_ok = True
+
+        # Check PostgreSQL
+        try:
+            pool = app.state.db_pool
+            async with pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            checks["database"] = "ok"
+        except Exception as exc:
+            logger.error("health_check_database_failed", error=str(exc))
+            checks["database"] = f"error: {exc}"
+            all_ok = False
+
+        # Check Redis
+        try:
+            redis = app.state.redis
+            if redis is None:
+                checks["redis"] = "not_configured"
+            else:
+                await redis.ping()
+                checks["redis"] = "ok"
+        except Exception as exc:
+            logger.error("health_check_redis_failed", error=str(exc))
+            checks["redis"] = f"error: {exc}"
+            all_ok = False
+
+        status_code = 200 if all_ok else 503
+        return JSONResponse(
+            content={"status": "ready" if all_ok else "unavailable", **checks},
+            status_code=status_code,
+        )
 
     # Serve frontend dashboard (only if build directory exists)
     if settings.frontend_dist_dir:

@@ -6,8 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from bsgateway.api.app import _init_redis, create_app, lifespan
+from bsgateway.tests.conftest import MockAcquire
 
 # ---------------------------------------------------------------------------
 # create_app
@@ -181,3 +183,113 @@ class TestLifespan:
             async with lifespan(app):
                 # cache should be None when no Redis
                 assert app.state.cache is None
+
+
+# ---------------------------------------------------------------------------
+# /health/ready endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestHealthReady:
+    def _make_app_with_state(
+        self,
+        *,
+        db_pool: MagicMock | None = None,
+        redis: AsyncMock | None = None,
+    ) -> FastAPI:
+        app = create_app()
+        if db_pool is not None:
+            app.state.db_pool = db_pool
+        if redis is not None:
+            app.state.redis = redis
+        else:
+            app.state.redis = None
+        return app
+
+    def test_all_healthy(self):
+        mock_conn = AsyncMock()
+        mock_conn.fetchval = AsyncMock(return_value=1)
+        mock_pool = MagicMock()
+        mock_pool.acquire.return_value = MockAcquire(mock_conn)
+
+        mock_redis = AsyncMock()
+        mock_redis.ping = AsyncMock(return_value=True)
+
+        app = self._make_app_with_state(db_pool=mock_pool, redis=mock_redis)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ready"
+        assert body["database"] == "ok"
+        assert body["redis"] == "ok"
+
+    def test_database_failure_returns_503(self):
+        mock_conn = AsyncMock()
+        mock_conn.fetchval = AsyncMock(side_effect=ConnectionError("db down"))
+        mock_pool = MagicMock()
+        mock_pool.acquire.return_value = MockAcquire(mock_conn)
+
+        app = self._make_app_with_state(db_pool=mock_pool, redis=None)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.get("/health/ready")
+        assert resp.status_code == 503
+        body = resp.json()
+        assert body["status"] == "unavailable"
+        assert "error" in body["database"]
+
+    def test_redis_failure_returns_503(self):
+        mock_conn = AsyncMock()
+        mock_conn.fetchval = AsyncMock(return_value=1)
+        mock_pool = MagicMock()
+        mock_pool.acquire.return_value = MockAcquire(mock_conn)
+
+        mock_redis = AsyncMock()
+        mock_redis.ping = AsyncMock(side_effect=ConnectionError("redis down"))
+
+        app = self._make_app_with_state(db_pool=mock_pool, redis=mock_redis)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.get("/health/ready")
+        assert resp.status_code == 503
+        body = resp.json()
+        assert body["status"] == "unavailable"
+        assert body["database"] == "ok"
+        assert "error" in body["redis"]
+
+    def test_redis_not_configured(self):
+        mock_conn = AsyncMock()
+        mock_conn.fetchval = AsyncMock(return_value=1)
+        mock_pool = MagicMock()
+        mock_pool.acquire.return_value = MockAcquire(mock_conn)
+
+        app = self._make_app_with_state(db_pool=mock_pool, redis=None)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ready"
+        assert body["database"] == "ok"
+        assert body["redis"] == "not_configured"
+
+    def test_both_failing_returns_503(self):
+        mock_conn = AsyncMock()
+        mock_conn.fetchval = AsyncMock(side_effect=ConnectionError("db down"))
+        mock_pool = MagicMock()
+        mock_pool.acquire.return_value = MockAcquire(mock_conn)
+
+        mock_redis = AsyncMock()
+        mock_redis.ping = AsyncMock(side_effect=ConnectionError("redis down"))
+
+        app = self._make_app_with_state(db_pool=mock_pool, redis=mock_redis)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.get("/health/ready")
+        assert resp.status_code == 503
+        body = resp.json()
+        assert body["status"] == "unavailable"
+        assert "error" in body["database"]
+        assert "error" in body["redis"]
