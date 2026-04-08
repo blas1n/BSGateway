@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { tenantsApi } from '../api/tenants';
 import { useAuth } from '../hooks/useAuth';
 import { rulesApi } from '../api/rules';
@@ -35,11 +35,7 @@ export function RoutingTestPage() {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadModelsAndRules();
-  }, []);
-
-  const loadModelsAndRules = async () => {
+  const loadModelsAndRules = useCallback(async () => {
     try {
       const m = await tenantsApi.listModels(tid);
       setModels(m || []);
@@ -51,7 +47,11 @@ export function RoutingTestPage() {
     } finally {
       setLoadingModels(false);
     }
-  };
+  }, [tid]);
+
+  useEffect(() => {
+    loadModelsAndRules();
+  }, [loadModelsAndRules]);
 
   const handleTest = async () => {
     if (!selectedModel || !messages[0]?.content) {

@@ -57,7 +57,6 @@ export function useAuth() {
         email: result.email,
       });
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState((prev) => ({ ...prev, isLoading: false }));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
