@@ -31,6 +31,13 @@ docker compose up
   rules engine matches via `classified_intent` (embedding similarity in `bsgateway/rules/intent.py`)
   and routes to the user-chosen model. The dashboard exposes this as a single
   Notion Mail-style "RouteCard" that pairs an Intent + Rule under the hood.
+- **Per-tenant embedding**: each tenant chooses its own embedding model via
+  `tenants.settings.embedding` JSONB (set via `PUT /tenants/{id}/embedding-settings`).
+  The chosen model is recorded on each `intent_examples.embedding_model` row so
+  that, after a model swap, stale embeddings are automatically skipped at
+  classification time and can be backfilled with `POST /tenants/{id}/intents/reembed`.
+  Implementation in `bsgateway/embedding/` (Protocol-based provider, factory,
+  serialization, hydration with stale-skip).
 - **Data collection**: PostgreSQL via asyncpg, SQL in `.sql` files (not ORM)
 - **Auth**: Supabase JWT via `bsvibe-auth` package — tenant mapping from `app_metadata.tenant_id`
 
@@ -57,3 +64,4 @@ docker compose up
 | `bsgateway/core/security.py` | AES-256-GCM encryption for provider API keys |
 | `bsgateway/api/deps.py` | GatewayAuthContext, auth dependencies (BSVibe-Auth) |
 | `bsgateway/routing/sql/` | schema.sql + queries.sql (named query pattern) |
+| `bsgateway/embedding/` | EmbeddingProvider protocol, LiteLLM impl, per-tenant factory, stale-skip hydration |

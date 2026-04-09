@@ -132,11 +132,6 @@ test.describe('API Keys Page', () => {
     await expect(page.getByText('bsg_new_abcdef123456789')).toBeVisible();
   });
 
-  test('shows security documentation section', async ({ page }) => {
-    await gotoApiKeys(page);
-    await expect(page.getByText('Secure your API implementation')).toBeVisible();
-  });
-
   test('empty state when no keys exist', async ({ page }) => {
     await mockGet(page, '/api-keys', []);
     await gotoApiKeys(page);

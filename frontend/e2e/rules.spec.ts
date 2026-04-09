@@ -17,6 +17,8 @@ test.describe('Routes Page (Notion Mail-style)', () => {
     await mockGet(page, '/intents', MOCK_INTENTS);
     await mockGet(page, '/intents/intent-1/examples', MOCK_EXAMPLES);
     await mockGet(page, '/models', MOCK_MODELS);
+    // EmbeddingSettingsCard fetches this on mount; default to "not configured".
+    await mockGet(page, '/embedding-settings', null);
   });
 
   test('displays page heading and natural-language subtitle', async ({ page }) => {
@@ -120,5 +122,58 @@ test.describe('Routes Page (Notion Mail-style)', () => {
     await page.goto('/intents');
     await expect(page).toHaveURL(/\/rules$/);
     await expect(page.getByRole('heading', { name: /routing rules/i })).toBeVisible();
+  });
+
+  test('embedding settings card shows "disabled" badge when not configured', async ({ page }) => {
+    await page.goto('/rules');
+    const card = page.getByRole('button', { name: /Embedding model/ });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('disabled', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/no embedding model configured/i),
+    ).toBeVisible();
+  });
+
+  test('embedding settings card expands and shows preset buttons', async ({ page }) => {
+    await page.goto('/rules');
+    await page.getByRole('button', { name: /Embedding model/ }).click();
+    await expect(page.getByPlaceholder('text-embedding-3-small')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'OpenAI text-embedding-3-small' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ollama nomic-embed-text' })).toBeVisible();
+  });
+
+  test('default fallback card shows missing badge when no default rule exists', async ({ page }) => {
+    // Override MOCK_RULES with a list that has NO default rule
+    const rulesWithoutDefault = MOCK_RULES.filter((r) => !r.is_default);
+    await mockGet(page, '/rules', rulesWithoutDefault);
+    await page.goto('/rules');
+    await expect(page.getByText('Default fallback')).toBeVisible();
+    await expect(page.getByText('missing', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/unmatched requests return 400/i),
+    ).toBeVisible();
+  });
+
+  test('default fallback card shows active when default rule configured', async ({ page }) => {
+    // MOCK_RULES already includes an is_default rule
+    await page.goto('/rules');
+    await expect(
+      page.getByText('Used when no other rule matches.'),
+    ).toBeVisible();
+  });
+
+  test('embedding settings card shows active state when configured', async ({ page }) => {
+    await mockGet(page, '/embedding-settings', {
+      model: 'text-embedding-3-small',
+      api_base: null,
+      timeout: 10,
+      max_input_length: 8000,
+    });
+    await page.goto('/rules');
+    const card = page.getByRole('button', { name: /Embedding model/ });
+    await expect(card.getByText('active', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/text-embedding-3-small.*classify intents/i),
+    ).toBeVisible();
   });
 });

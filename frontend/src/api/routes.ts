@@ -1,9 +1,11 @@
 import type {
+  EmbeddingSettings,
+  Example,
   Intent,
+  ReembedResponse,
   Rule,
   RuleCondition,
   TenantModel,
-  Example,
 } from '../types/api';
 import { intentsApi } from './intents';
 import { rulesApi } from './rules';
@@ -274,4 +276,70 @@ export const routesApi = {
       preset_name: presetName,
       model_mapping: modelMapping,
     }),
+
+  // ---- Per-tenant embedding settings ----
+
+  getEmbeddingSettings: (tenantId: string) =>
+    api.get<EmbeddingSettings | null>(`/tenants/${tenantId}/embedding-settings`),
+
+  putEmbeddingSettings: (tenantId: string, settings: EmbeddingSettings) =>
+    api.put<EmbeddingSettings>(`/tenants/${tenantId}/embedding-settings`, settings),
+
+  deleteEmbeddingSettings: (tenantId: string) =>
+    api.delete<void>(`/tenants/${tenantId}/embedding-settings`),
+
+  reembed: (tenantId: string) =>
+    api.post<ReembedResponse>(`/tenants/${tenantId}/intents/reembed`, {}),
+
+  // ---- Default fallback rule ----
+  //
+  // The rule engine returns the default rule when no other rule matches.
+  // We model "the default" as a single is_default=true rule with no conditions
+  // and a fixed name (`__default__`). Setting it creates the rule if missing,
+  // or updates the target_model in place.
+
+  getDefaultRule: async (tenantId: string): Promise<Rule | null> => {
+    const rules = await rulesApi.list(tenantId);
+    return rules.find((r) => r.is_default) || null;
+  },
+
+  setDefaultModel: async (tenantId: string, targetModel: string): Promise<Rule> => {
+    const existing = await routesApi.getDefaultRule(tenantId);
+    if (existing) {
+      return (rulesApi.update as (
+        tid: string,
+        id: string,
+        data: Record<string, unknown>,
+      ) => Promise<Rule>)(tenantId, existing.id, { target_model: targetModel });
+    }
+    // Pick a high priority number (lowest precedence) so it sits at the bottom
+    const allRules = await rulesApi.list(tenantId);
+    const maxPriority = allRules.reduce((m, r) => Math.max(m, r.priority), -1);
+    return rulesApi.create(tenantId, {
+      name: '__default__',
+      priority: maxPriority + 1000, // sit far below intent rules
+      is_default: true,
+      target_model: targetModel,
+      conditions: [],
+    });
+  },
+
+  clearDefaultModel: async (tenantId: string): Promise<void> => {
+    const existing = await routesApi.getDefaultRule(tenantId);
+    if (existing) await rulesApi.delete(tenantId, existing.id);
+  },
+
+  // ---- Priority reordering ----
+
+  reorderRoutes: async (
+    tenantId: string,
+    orderedRuleIds: string[],
+  ): Promise<void> => {
+    // Backend takes a {ruleId: priority} map. Re-number from 0 in the given order.
+    const priorities: Record<string, number> = {};
+    orderedRuleIds.forEach((id, index) => {
+      priorities[id] = index;
+    });
+    await rulesApi.reorder(tenantId, priorities);
+  },
 };

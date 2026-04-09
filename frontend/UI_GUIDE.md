@@ -138,6 +138,15 @@ to the bottom.
 **Legacy `/intents` route**: redirects to `/rules`. The standalone IntentsPage
 component still exists in source for safety but is not wired into the router.
 
+**Embedding model section** (top of RoutesPage):
+- Inline form: model identifier + optional API base
+- Set/clear via `PUT /tenants/{id}/embedding-settings` and
+  `DELETE /tenants/{id}/embedding-settings`
+- Changing the model invalidates existing example embeddings (they are tagged
+  with the model that produced them and skipped at classification time)
+- Re-embed button calls `POST /tenants/{id}/intents/reembed` to backfill all
+  examples with the current model in a single batch API call
+
 ---
 
 ### 4. ModelsPage

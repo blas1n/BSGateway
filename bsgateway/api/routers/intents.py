@@ -259,6 +259,17 @@ async def reembed(
             detail="No embedding model configured for this tenant",
         )
 
+    # Fail fast: verify the embedding endpoint is reachable BEFORE we read the
+    # full set of stale examples and start churning through them. Without this,
+    # a misconfigured endpoint would silently mark every example as failed.
+    try:
+        await embed_svc.test_connection()
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Embedding connection test failed: {e}",
+        ) from e
+
     repo = _get_repo(request)
     stale = await repo.list_examples_needing_reembedding(tenant_id, embed_svc.model)
     if not stale:

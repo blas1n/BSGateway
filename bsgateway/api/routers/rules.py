@@ -104,12 +104,18 @@ async def _build_rule_responses_batch(
     rows: list[asyncpg.Record],
     tenant_id: UUID,
 ) -> list[RuleResponse]:
-    """Build multiple rule responses with a single conditions query (avoids N+1)."""
+    """Build multiple rule responses with a single conditions query (avoids N+1).
+
+    Rule rows may come from the cache (where ``id`` is a JSON-deserialized
+    string) or from a fresh DB fetch (where it is a UUID object). Conditions
+    always come from the DB and have UUID rule_ids. We normalize both sides
+    to strings so the lookup works regardless of source.
+    """
     all_conditions = await repo.list_conditions_for_tenant(tenant_id)
-    conditions_by_rule: dict[UUID, list[asyncpg.Record]] = defaultdict(list)
+    conditions_by_rule: dict[str, list[asyncpg.Record]] = defaultdict(list)
     for c in all_conditions:
-        conditions_by_rule[c["rule_id"]].append(c)
-    return [_row_to_rule_response(r, conditions_by_rule.get(r["id"], [])) for r in rows]
+        conditions_by_rule[str(c["rule_id"])].append(c)
+    return [_row_to_rule_response(r, conditions_by_rule.get(str(r["id"]), [])) for r in rows]
 
 
 # ---------------------------------------------------------------------------

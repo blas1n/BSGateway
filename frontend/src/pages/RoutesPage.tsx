@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { RouteCard } from '../components/rules/RouteCard';
+import { EmbeddingSettingsCard } from '../components/rules/EmbeddingSettingsCard';
+import { DefaultFallbackCard } from '../components/rules/DefaultFallbackCard';
 import { routesApi } from '../api/routes';
 import type { TenantModel } from '../types/api';
 
@@ -221,11 +223,34 @@ export function RoutesPage() {
 
   const [showModal, setShowModal] = useState(false);
 
+  const handleReorder = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!cards) return;
+      const intentCards = cards.filter((c) => !c.isDefault);
+      if (toIndex < 0 || toIndex >= intentCards.length) return;
+      const reordered = [...intentCards];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+      try {
+        await routesApi.reorderRoutes(
+          tid,
+          reordered.map((c) => c.ruleId),
+        );
+        refetch();
+      } catch (err) {
+        console.error('reorder failed', err);
+      }
+    },
+    [cards, tid, refetch],
+  );
+
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBanner message={error} onRetry={refetch} />;
 
   const allCards = cards || [];
   const modelList = models || [];
+  const intentCards = allCards.filter((c) => !c.isDefault);
+  const defaultCard = allCards.find((c) => c.isDefault) || null;
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8">
@@ -258,9 +283,11 @@ export function RoutesPage() {
         </button>
       </div>
 
-      {allCards.length > 0 ? (
+      <EmbeddingSettingsCard tenantId={tid} />
+
+      {intentCards.length > 0 ? (
         <div className="space-y-3">
-          {allCards.map((card) => (
+          {intentCards.map((card, index) => (
             <RouteCard
               key={card.ruleId}
               card={card}
@@ -268,11 +295,15 @@ export function RoutesPage() {
               models={modelList}
               onUpdate={refetch}
               onDelete={refetch}
+              onMoveUp={() => handleReorder(index, index - 1)}
+              onMoveDown={() => handleReorder(index, index + 1)}
+              canMoveUp={index > 0}
+              canMoveDown={index < intentCards.length - 1}
             />
           ))}
         </div>
       ) : (
-        <div className="bg-surface-container-low rounded-2xl border border-outline-variant/5 flex flex-col items-center justify-center py-16 min-h-[400px]">
+        <div className="bg-surface-container-low rounded-2xl border border-outline-variant/5 flex flex-col items-center justify-center py-16 min-h-[300px]">
           <div className="relative w-32 h-32 mb-8">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-24 h-24 rounded-full border-2 border-primary/20 animate-pulse flex items-center justify-center">
@@ -296,6 +327,13 @@ export function RoutesPage() {
           </button>
         </div>
       )}
+
+      <DefaultFallbackCard
+        tenantId={tid}
+        card={defaultCard}
+        models={modelList}
+        onChange={refetch}
+      />
     </div>
   );
 }

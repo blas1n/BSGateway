@@ -22,12 +22,14 @@ test.describe('Routing Simulator Page', () => {
     await expect(page.getByText('Configure a request and run the simulation')).toBeVisible();
   });
 
-  test('model selector populated with registered models', async ({ page }) => {
+  test('shows informational banner explaining the model is the output', async ({ page }) => {
     await page.goto('/test');
-    const select = page.locator('select').first();
-    await expect(select).toBeVisible();
-    // Check options contain model names
-    await expect(select.locator('option')).toHaveCount(3);
+    await expect(
+      page.getByText(/routing decision is the/i),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/output/i).first(),
+    ).toBeVisible();
   });
 
   test('prompt textarea is visible with placeholder', async ({ page }) => {

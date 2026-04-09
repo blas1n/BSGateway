@@ -10,9 +10,23 @@ interface RouteCardProps {
   models: TenantModel[];
   onUpdate: () => void;
   onDelete: (intentId: string | null, ruleId: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }
 
-export function RouteCard({ card, tenantId, models, onUpdate, onDelete }: RouteCardProps) {
+export function RouteCard({
+  card,
+  tenantId,
+  models,
+  onUpdate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
+}: RouteCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [newExample, setNewExample] = useState('');
   const [savingExample, setSavingExample] = useState(false);
@@ -74,66 +88,9 @@ export function RouteCard({ card, tenantId, models, onUpdate, onDelete }: RouteC
     }
   };
 
-  // Default fallback card variant — simpler layout
-  if (card.isDefault) {
-    return (
-      <div className="bg-surface-container-low rounded-2xl border border-primary/15 p-6 flex flex-col md:flex-row md:items-center gap-4 group">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="material-symbols-outlined text-primary">flag</span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-on-surface">Default fallback</span>
-              <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded border border-primary/20 uppercase">
-                default
-              </span>
-            </div>
-            <p className="text-xs text-on-surface-variant mt-1">
-              Used when no other rule matches.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={card.targetModel}
-            onChange={(e) => handleModelChange(e.target.value)}
-            disabled={updatingModel}
-            className="bg-surface-container-highest border-none rounded-xl py-2 px-3 text-sm font-mono focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
-          >
-            {!models.some((m) => m.model_name === card.targetModel) && (
-              <option value={card.targetModel}>{card.targetModel}</option>
-            )}
-            {models.map((m) => (
-              <option key={m.id} value={m.model_name}>
-                {m.model_name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() =>
-              handleDelete(card.ruleId, () =>
-                routesApi.delete(tenantId, card.intentId, card.ruleId).then(() => {
-                  onDelete(card.intentId, card.ruleId);
-                }),
-              )
-            }
-            className={`p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100 ${
-              deleting === card.ruleId
-                ? 'bg-error/20 text-error'
-                : 'hover:bg-error/10 text-on-surface-variant hover:text-error'
-            }`}
-            title="Delete"
-          >
-            <span className="material-symbols-outlined text-sm">
-              {deleting === card.ruleId ? 'check' : 'delete'}
-            </span>
-          </button>
-        </div>
-        {error && (
-          <div className="text-xs text-error w-full">{error}</div>
-        )}
-      </div>
-    );
-  }
+  // Default fallback rules are rendered separately by DefaultFallbackCard;
+  // RoutesPage filters them out before passing into this component.
+  if (card.isDefault) return null;
 
   return (
     <div className="bg-surface-container-low rounded-2xl border border-outline-variant/5 hover:border-outline-variant/20 transition-colors group">
@@ -193,26 +150,48 @@ export function RouteCard({ card, tenantId, models, onUpdate, onDelete }: RouteC
           </div>
         </div>
 
-        {/* Delete button */}
-        <button
-          onClick={() =>
-            handleDelete(card.ruleId, () =>
-              routesApi.delete(tenantId, card.intentId, card.ruleId).then(() => {
-                onDelete(card.intentId, card.ruleId);
-              }),
-            )
-          }
-          className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
-            deleting === card.ruleId
-              ? 'bg-error/20 text-error opacity-100'
-              : 'hover:bg-error/10 text-on-surface-variant hover:text-error'
-          }`}
-          title="Delete rule"
-        >
-          <span className="material-symbols-outlined text-sm">
-            {deleting === card.ruleId ? 'check' : 'delete'}
-          </span>
-        </button>
+        {/* Reorder + Delete buttons */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onMoveUp && (
+            <button
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              className="p-1.5 rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Move up (higher priority)"
+            >
+              <span className="material-symbols-outlined text-sm">arrow_upward</span>
+            </button>
+          )}
+          {onMoveDown && (
+            <button
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              className="p-1.5 rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Move down (lower priority)"
+            >
+              <span className="material-symbols-outlined text-sm">arrow_downward</span>
+            </button>
+          )}
+          <button
+            onClick={() =>
+              handleDelete(card.ruleId, () =>
+                routesApi.delete(tenantId, card.intentId, card.ruleId).then(() => {
+                  onDelete(card.intentId, card.ruleId);
+                }),
+              )
+            }
+            className={`p-2 rounded-lg transition-all ${
+              deleting === card.ruleId
+                ? 'bg-error/20 text-error'
+                : 'hover:bg-error/10 text-on-surface-variant hover:text-error'
+            }`}
+            title="Delete rule"
+          >
+            <span className="material-symbols-outlined text-sm">
+              {deleting === card.ruleId ? 'check' : 'delete'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Expandable examples section */}

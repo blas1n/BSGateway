@@ -14,6 +14,8 @@ from bsgateway.api.deps import (
     require_tenant_access,
 )
 from bsgateway.core.exceptions import DuplicateError
+from bsgateway.embedding.provider import LiteLLMEmbeddingProvider
+from bsgateway.embedding.service import EmbeddingService
 from bsgateway.embedding.settings import EmbeddingSettings
 from bsgateway.tenant.models import (
     EmbeddingSettingsBody,
@@ -176,6 +178,11 @@ async def put_embedding_settings(
 ) -> EmbeddingSettingsBody:
     """Set the tenant's embedding configuration.
 
+    Performs a live connection test against the proposed embedding endpoint
+    *before* persisting. A misconfigured model would otherwise silently
+    poison every example create with NULL embeddings until the operator
+    notices intent matching is broken.
+
     Changing the model invalidates existing embeddings (they're tagged with
     the model that produced them and skipped at classification time). Call
     ``POST /tenants/{id}/intents/reembed`` afterward to backfill examples
@@ -185,6 +192,22 @@ async def put_embedding_settings(
     tenant = await svc.get_tenant(tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
+
+    # Connection test against the proposed config
+    proposed = EmbeddingSettings(
+        model=body.model,
+        api_base=body.api_base,
+        timeout=body.timeout,
+        max_input_length=body.max_input_length,
+    )
+    test_service = EmbeddingService(LiteLLMEmbeddingProvider(proposed))
+    try:
+        await test_service.test_connection()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Embedding connection test failed: {e}",
+        ) from e
 
     new_settings = dict(tenant.settings or {})
     new_settings["embedding"] = body.model_dump()

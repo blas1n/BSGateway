@@ -38,6 +38,19 @@ class EmbeddingService:
     def model(self) -> str:
         return self._provider.model
 
+    async def test_connection(self) -> int:
+        """Verify the embedding provider is reachable and returns sane data.
+
+        Sends a single tiny embed request and asserts the response is a
+        non-empty vector. Returns the vector dimension on success. Raises
+        whatever error the underlying provider raises (typically a
+        litellm exception with the upstream HTTP status).
+        """
+        result = await self._provider.embed(["ping"])
+        if not result or not result[0]:
+            raise RuntimeError("Embedding provider returned empty result for test input")
+        return len(result[0])
+
     async def embed_one(self, text: str) -> EmbeddedExample:
         """Embed a single text. Returns an EmbeddedExample (embedding=None on failure)."""
         try:

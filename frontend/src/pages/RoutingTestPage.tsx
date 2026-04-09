@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { tenantsApi } from '../api/tenants';
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { rulesApi } from '../api/rules';
-import type { TenantModel } from '../types/api';
-import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 
 interface TestMessage {
@@ -27,44 +24,26 @@ interface TestResult {
 export function RoutingTestPage() {
   const { tenantId } = useAuth();
   const tid = tenantId || '';
-  const [models, setModels] = useState<TenantModel[]>([]);
-  const [loadingModels, setLoadingModels] = useState(true);
-  const [selectedModel, setSelectedModel] = useState('');
   const [messages, setMessages] = useState<TestMessage[]>([{ role: 'user', content: '' }]);
   const [result, setResult] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadModelsAndRules = useCallback(async () => {
-    try {
-      const m = await tenantsApi.listModels(tid);
-      setModels(m || []);
-      if (m && m.length > 0) {
-        setSelectedModel(m[0].model_name);
-      }
-    } catch {
-      setError('Failed to load models');
-    } finally {
-      setLoadingModels(false);
-    }
-  }, [tid]);
-
-  useEffect(() => {
-    loadModelsAndRules();
-  }, [loadModelsAndRules]);
-
   const handleTest = async () => {
-    if (!selectedModel || !messages[0]?.content) {
-      setError('Model and at least one message required');
+    if (!messages[0]?.content) {
+      setError('At least one message is required');
       return;
     }
 
     setTesting(true);
     setError(null);
     try {
+      // Always test with model="auto" — the whole point is to see which
+      // concrete model the router picks. The model is the OUTPUT of the
+      // simulation, not an input.
       const data = await rulesApi.test(tid, {
-        model: selectedModel,
-        messages: messages.filter(m => m.content.trim()),
+        model: 'auto',
+        messages: messages.filter((m) => m.content.trim()),
       });
       setResult(data);
     } catch (err) {
@@ -73,8 +52,6 @@ export function RoutingTestPage() {
       setTesting(false);
     }
   };
-
-  if (loadingModels) return <LoadingSpinner />;
 
   return (
     <div className="p-8 space-y-8">
@@ -99,29 +76,10 @@ export function RoutingTestPage() {
             </div>
 
             <div className="space-y-6 flex-1 flex flex-col">
-              {/* Model selector */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Model</label>
-                {models.length > 0 ? (
-                  <div className="relative">
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className="w-full bg-surface-container-low border-none rounded-lg py-2 px-3 text-sm appearance-none focus:ring-1 focus:ring-amber-500 border border-outline-variant/15"
-                    >
-                      {models.map((m) => (
-                        <option key={m.id} value={m.model_name}>
-                          {m.model_name} ({m.provider})
-                        </option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-2 top-2 text-slate-500 pointer-events-none">expand_more</span>
-                  </div>
-                ) : (
-                  <div className="border border-outline-variant/15 rounded-lg px-3 py-2 text-sm text-on-surface-variant bg-surface-container-low">
-                    No models registered
-                  </div>
-                )}
+              <div className="bg-surface-container-low border border-outline-variant/15 rounded-lg px-3 py-2 text-xs text-on-surface-variant flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-500 text-sm">alt_route</span>
+                Routing decision is the <b className="text-on-surface">output</b> of the simulation —
+                no need to pick a model.
               </div>
 
               {/* Messages */}
@@ -176,7 +134,7 @@ export function RoutingTestPage() {
 
               <button
                 onClick={handleTest}
-                disabled={testing || !selectedModel || !messages[0]?.content}
+                disabled={testing || !messages[0]?.content}
                 className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-amber-900/20 disabled:opacity-50"
               >
                 {testing ? (
