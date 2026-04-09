@@ -4,52 +4,66 @@ const TENANT_ID = 'test-tenant-id';
 const API_BASE = '/api/v1';
 
 /**
- * Inject fake auth tokens into localStorage so the app considers us logged in.
- * Must be called before navigating to any page.
+ * Build a fake JWT (unsigned) with the given payload for testing.
+ * The signature is empty — only the client-side base64 decode matters.
+ */
+function buildFakeJwt(payload: Record<string, unknown>): string {
+  const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const body = btoa(JSON.stringify(payload));
+  return `${header}.${body}.fake`;
+}
+
+const FAKE_JWT = buildFakeJwt({
+  sub: 'user-test-123',
+  email: 'test@example.com',
+  app_metadata: { tenant_id: TENANT_ID, role: 'admin' },
+  exp: Math.floor(Date.now() / 1000) + 3600,
+});
+
+/**
+ * Mock the auth.bsvibe.dev/api/session endpoint to return a valid session.
+ * This replaces the old localStorage-based injectAuth.
  */
 export async function injectAuth(page: Page) {
-  await page.addInitScript(() => {
-    // BSVibeAuth stores user in localStorage under 'bsvibe_user'
-    // expiresAt is in seconds (unix timestamp), not milliseconds
-    const fakeUser = {
-      id: 'user-test-123',
-      accessToken: 'fake-access-token',
-      refreshToken: 'fake-refresh-token',
-      tenantId: 'test-tenant-id',
-      role: 'admin',
-      email: 'test@example.com',
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
-    };
-    localStorage.setItem('bsvibe_user', JSON.stringify(fakeUser));
-    sessionStorage.setItem('bsvibe_tenant_name', 'Test Tenant');
+  await page.route('**/auth.bsvibe.dev/api/session', (route) => {
+    const method = route.request().method();
+    if (method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: FAKE_JWT,
+          refresh_token: 'fake-refresh-token',
+          expires_in: 3600,
+        }),
+      });
+    }
+    // DELETE (logout) — just return success
+    if (method === 'DELETE') {
+      return route.fulfill({ status: 200, body: '{}' });
+    }
+    return route.continue();
   });
+}
+
+/**
+ * Mock the session endpoint to return 401 (unauthenticated).
+ */
+export async function mockUnauthSession(page: Page) {
+  await page.route('**/auth.bsvibe.dev/api/session', (route) => {
+    return route.fulfill({ status: 401, body: '{"error":"no session"}' });
+  });
+}
+
+/** Navigate as an unauthenticated user. */
+export async function gotoUnauth(page: Page, path: string) {
+  await mockUnauthSession(page);
+  await page.goto(path);
 }
 
 /** Standard API path builder */
 export function apiPath(path: string): string {
   return `${API_BASE}/tenants/${TENANT_ID}${path}`;
-}
-
-/**
- * Set the `bsvibe_skip_sso` localStorage flag so `BSVibeAuth.checkSession()`
- * short-circuits and behaves as fully unauthenticated. This avoids the
- * silent-SSO redirect that would otherwise navigate the test off-origin.
- *
- * The query-param escape hatch (`?sso_error=...`) does not work here because
- * React's `StrictMode` invokes effects twice in dev — the first run strips
- * the param via `replaceState`, then the second run sees a clean URL and
- * fires the silent-check anyway, causing a redirect loop.
- */
-export async function skipSso(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem('bsvibe_skip_sso', '1');
-  });
-}
-
-/** Navigate as an unauthenticated user without leaving the LoginPage. */
-export async function gotoUnauth(page: Page, path: string) {
-  await skipSso(page);
-  await page.goto(path);
 }
 
 /** Mock a GET endpoint returning JSON */
@@ -72,7 +86,7 @@ export async function mockPost(page: Page, pathSuffix: string, body: unknown, st
   });
 }
 
-/** Mock tenant info endpoint (used by useAuth to fetch tenant name) */
+/** Mock tenant info endpoint */
 export async function mockTenantInfo(page: Page) {
   await page.route(`**${API_BASE}/tenants/${TENANT_ID}`, (route) => {
     if (route.request().method() === 'GET') {
