@@ -108,15 +108,15 @@ internals; each card is a single Intent + Rule pair joined by a
 - Active dot toggle on the left (`bg-tertiary` glow when active, click to enable/disable)
 - Center: natural-language description text + target model selector +
   priority badge (P0, P1, …) + expandable examples count
-- Hover-reveal delete button (two-stage confirmation via `useDeleteConfirm`)
+- Hover-reveal ↑↓ reorder arrows + delete button (two-stage confirmation)
 - Expanding the card reveals example phrases (intent training data) with
   add/remove inline editing
 
-**RouteCard (default fallback)**:
-- Compact horizontal layout with `flag` icon
-- Inline model selector
-- "Used when no other rule matches." subtitle
-- Same hover-reveal delete
+**DefaultFallbackCard** (always visible at the bottom):
+- Shows "missing" badge when no `is_default` rule exists — warns that
+  unmatched requests will fail with 400
+- Inline model selector to set the default fallback model
+- "Clear" button to remove the default rule
 
 **Create Modal** (only 2 required inputs):
 - **어떤 요청을 라우팅할까요?** — natural-language description textarea (required)
@@ -138,14 +138,14 @@ to the bottom.
 **Legacy `/intents` route**: redirects to `/rules`. The standalone IntentsPage
 component still exists in source for safety but is not wired into the router.
 
-**Embedding model section** (top of RoutesPage):
-- Inline form: model identifier + optional API base
-- Set/clear via `PUT /tenants/{id}/embedding-settings` and
-  `DELETE /tenants/{id}/embedding-settings`
+**Embedding model section** (top of RoutesPage, collapsible):
+- Model identifier + optional API base + preset buttons (OpenAI / Ollama)
+- Save performs a live connection test first (test-embeds "ping") — fails
+  with 400 and error message if the endpoint is unreachable or misconfigured
 - Changing the model invalidates existing example embeddings (they are tagged
   with the model that produced them and skipped at classification time)
-- Re-embed button calls `POST /tenants/{id}/intents/reembed` to backfill all
-  examples with the current model in a single batch API call
+- "Re-embed examples" button calls `POST /tenants/{id}/intents/reembed` —
+  also connection-tests first (502 on failure), then backfills in a single batch
 
 ---
 
@@ -215,43 +215,27 @@ component remains in the source tree but is not imported anywhere.
 
 ---
 
-### 6. RoutingTestPage
+### 6. RoutingTestPage (Routing Simulator)
 
-**Purpose**: Manually test routing logic before deploying to production
+**Purpose**: Test which model the router picks for a given prompt — the model
+is the **output** of the simulation, not an input.
 
-**Test Form**:
-- **Layout**: Single column form
+**Input panel** (left):
+- Prompt textarea only. No model selector — always sends `model: "auto"`.
+- Role selector (user/assistant/system) per message, "Add Message" button.
+- "Run Simulation" button (disabled until at least one message has content).
 
-**Form Fields**:
-- **Model** (select, required)
-  - Dropdown of all registered models
-  - Placeholder: "Select model"
+**Result panel** (right):
+- **Routed to**: the concrete model name selected by the engine (large text).
+- **MATCHED / NO MATCH** badge.
+- **Matched rule**: the operator's natural-language description (resolved from
+  intent.description on the backend — never shows internal slugs like
+  `route-1775715513497`).
+- **Detected intent**: shown inline when `classified_intent` is present.
+- **Routing Path**: visual flow (Input → Classifier → Rules → Model).
 
-- **Request Messages** (dynamic list, at least 1 required)
-  - Role (select): "user", "assistant", "system"
-  - Content (textarea): The message text
-  - Add/Remove buttons
-
-- **Test Button**: "Test Routing"
-  - Shows loading spinner while request is processed
-
-**Response**:
-- **Box**: bg-white rounded shadow p-6
-- **Fields**:
-  - **Selected Model**: Which model was chosen (after rule evaluation)
-  - **Matched Rule**: Which rule (if any) triggered this selection
-  - **Rule Conditions**: Display matched conditions for transparency
-  - **Alternative Models**: Show other available models (in case user wants to override)
-  - **Latency**: How long evaluation took
-
-**Error Handling**:
-- If route selection fails: Show error message
-- If model not found: Show helpful error
-
-**UX Notes**:
-- This is a debugging tool for admins
-- Shows the full decision path (not just final result)
-- Useful for testing new rules before activation
+No Evaluation Trace or Request Context sections — those were removed as
+operator-facing noise (raw JSON of internal rule data).
 
 ---
 
