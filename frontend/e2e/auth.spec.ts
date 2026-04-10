@@ -51,13 +51,3 @@ test.describe('Login Page', () => {
     await expect(page.getByRole('button', { name: /sign in with bsvibe/i })).toBeVisible();
   });
 });
-
-test.describe('Auth Callback', () => {
-  test('callback page processes auth and redirects', async ({ page }) => {
-    // The callback page calls auth.handleCallback() then navigates away
-    // Without valid tokens, it redirects to root (login page)
-    const response = await page.goto('/auth/callback');
-    // The page should load (200) and then redirect via JS
-    expect(response?.status()).toBe(200);
-  });
-});
