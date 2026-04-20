@@ -84,12 +84,15 @@ export function DefaultFallbackCard({ tenantId, card, models, onChange }: Props)
           disabled={busy || models.length === 0}
           className="bg-surface-container-highest border-none rounded-xl py-2 px-3 text-sm font-mono focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
         >
-          <option value="">Select a model…</option>
-          {models.map((m) => (
-            <option key={m.id} value={m.model_name}>
-              {m.model_name}
-            </option>
-          ))}
+          {models.map((m) => {
+            const exType =
+              m.provider === 'executor' ? m.litellm_model.split('/', 2)[1] : null;
+            return (
+              <option key={m.id} value={m.model_name}>
+                {exType ? `${m.model_name} (${exType})` : m.model_name}
+              </option>
+            );
+          })}
         </select>
         {isConfigured && (
           <button

@@ -1,0 +1,74 @@
+"""Tests for WorkerDispatcher: task dispatch via Redis Streams."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+from uuid import uuid4
+
+import pytest
+
+from bsgateway.executor.dispatcher import WORKER_STREAM_PREFIX, WorkerDispatcher
+from bsgateway.streams import RedisStreamManager
+
+
+@pytest.fixture
+def mock_stream_manager() -> AsyncMock:
+    sm = AsyncMock(spec=RedisStreamManager)
+    sm.publish.return_value = "msg-001"
+    return sm
+
+
+@pytest.fixture
+def dispatcher(mock_stream_manager: AsyncMock) -> WorkerDispatcher:
+    return WorkerDispatcher(mock_stream_manager)
+
+
+class TestDispatchTask:
+    async def test_publishes_to_correct_stream(
+        self, dispatcher: WorkerDispatcher, mock_stream_manager: AsyncMock
+    ) -> None:
+        worker_id = uuid4()
+        task_id = uuid4()
+
+        await dispatcher.dispatch_task(
+            worker_id=worker_id,
+            task_id=task_id,
+            executor_type="claude_code",
+            prompt="Write tests",
+        )
+
+        expected_stream = f"{WORKER_STREAM_PREFIX}{worker_id}"
+        call_args = mock_stream_manager.publish.call_args
+        assert call_args[0][0] == expected_stream
+
+    async def test_includes_required_fields(
+        self, dispatcher: WorkerDispatcher, mock_stream_manager: AsyncMock
+    ) -> None:
+        worker_id = uuid4()
+        task_id = uuid4()
+
+        await dispatcher.dispatch_task(
+            worker_id=worker_id,
+            task_id=task_id,
+            executor_type="codex",
+            prompt="Fix bug",
+        )
+
+        data = mock_stream_manager.publish.call_args[0][1]
+        assert data["task_id"] == str(task_id)
+        assert data["executor_type"] == "codex"
+        assert data["prompt"] == "Fix bug"
+        assert data["action"] == "execute"
+        assert "dispatched_at" in data
+
+    async def test_returns_message_id(
+        self, dispatcher: WorkerDispatcher, mock_stream_manager: AsyncMock
+    ) -> None:
+        msg_id = await dispatcher.dispatch_task(
+            worker_id=uuid4(),
+            task_id=uuid4(),
+            executor_type="claude_code",
+            prompt="hello",
+        )
+
+        assert msg_id == "msg-001"

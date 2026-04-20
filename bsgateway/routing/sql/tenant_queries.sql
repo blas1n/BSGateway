@@ -35,6 +35,22 @@ INSERT INTO tenant_models (tenant_id, model_name, provider, litellm_model, api_k
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id, tenant_id, model_name, provider, litellm_model, api_base, is_active, extra_params, created_at, updated_at;
 
+-- name: upsert_worker_model
+INSERT INTO tenant_models (tenant_id, model_name, provider, litellm_model, api_key_encrypted, api_base, extra_params, is_active)
+VALUES ($1, $2, 'executor', $3, NULL, NULL, $4, TRUE)
+ON CONFLICT (tenant_id, model_name) DO UPDATE
+SET provider = EXCLUDED.provider,
+    litellm_model = EXCLUDED.litellm_model,
+    extra_params = EXCLUDED.extra_params,
+    is_active = TRUE,
+    updated_at = NOW()
+RETURNING id, model_name;
+
+-- name: delete_worker_model
+DELETE FROM tenant_models
+WHERE tenant_id = $1 AND model_name = $2 AND provider = 'executor'
+  AND (extra_params->>'worker_id') = $3;
+
 -- name: get_tenant_model
 SELECT id, tenant_id, model_name, provider, litellm_model, api_key_encrypted, api_base,
        is_active, extra_params, created_at, updated_at

@@ -180,3 +180,29 @@ export interface UsageResponse {
   by_rule: Record<string, number>;
   daily_breakdown: DailyUsage[];
 }
+
+export interface Worker {
+  id: string;
+  tenant_id: string;
+  name: string;
+  labels: string[];
+  capabilities: string[];
+  status: string;
+  last_heartbeat: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExecutorTask {
+  id: string;
+  tenant_id: string;
+  executor_type: string;
+  prompt: string;
+  status: string;
+  worker_id: string | null;
+  output: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}

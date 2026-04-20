@@ -219,17 +219,20 @@ class ChatService:
         tenant_id: UUID,
         request_data: dict,
     ) -> Any:
-        """Full pipeline: load config → resolve model → call litellm."""
+        """Full pipeline: load config → resolve model → call litellm (or dispatch to worker)."""
+        tenant_config = await self.load_tenant_config(tenant_id)
+        model, rule_match = await self.resolve_model(tenant_config, request_data)
+
+        # Executor models route to a worker instead of litellm
+        if model.provider == "executor":
+            return await self._execute_via_worker(tenant_id, request_data, model, rule_match)
+
         if litellm is None:
             raise ChatError(
                 "litellm is not installed",
                 code="dependency_missing",
                 status_code=500,
             )
-
-        tenant_config = await self.load_tenant_config(tenant_id)
-
-        model, rule_match = await self.resolve_model(tenant_config, request_data)
 
         # Decrypt provider API key
         api_key: str | None = None
@@ -297,6 +300,151 @@ class ChatService:
         task.add_done_callback(self._on_background_done)
 
         return response
+
+    async def _execute_via_worker(
+        self,
+        tenant_id: UUID,
+        request_data: dict,
+        model: TenantModel,
+        rule_match: RuleMatch | None,
+    ) -> dict[str, Any]:
+        """Dispatch a chat request to an executor worker and await the result.
+
+        1. Pull the last user message as the prompt.
+        2. Create an executor_tasks row.
+        3. Find an available worker for the tenant; 503 if none.
+        4. Publish the task to the worker's Redis Stream.
+        5. Poll executor_tasks until done/failed or timeout.
+        6. Return an OpenAI-compatible chat completion envelope.
+        """
+        from bsgateway.executor.dispatcher import WorkerDispatcher
+        from bsgateway.executor.sql_loader import ExecutorSqlLoader
+
+        sql = ExecutorSqlLoader()
+
+        # Extract the last user message as the prompt
+        messages = request_data.get("messages", [])
+        prompt = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                prompt = content if isinstance(content, str) else str(content)
+                break
+        if not prompt:
+            raise ChatError("Executor models require a user message", code="no_user_message")
+
+        # Strip "executor/" prefix to get the executor type
+        lm = model.litellm_model
+        executor_type = lm.split("/", 1)[-1] if "/" in lm else lm
+
+        # Create task
+        async with self._pool.acquire() as conn:
+            task_row = await conn.fetchrow(
+                sql.query("create_task"), tenant_id, executor_type, prompt
+            )
+
+        # Prefer the worker pinned to this model in extra_params (set when the
+        # worker registers). Fall back to any available worker (legacy).
+        extra = model.extra_params or {}
+        pinned_worker_id = extra.get("worker_id")
+        worker_id: UUID | None = None
+
+        async with self._pool.acquire() as conn:
+            if pinned_worker_id:
+                pinned_row = await conn.fetchrow(
+                    "SELECT id, status, last_heartbeat FROM workers "
+                    "WHERE id = $1 AND tenant_id = $2 AND is_active = TRUE",
+                    UUID(str(pinned_worker_id)),
+                    tenant_id,
+                )
+                if pinned_row:
+                    # Accept the pinned worker even if heartbeat is stale —
+                    # the user explicitly registered it as a routable model.
+                    worker_id = pinned_row["id"]
+
+            if worker_id is None:
+                fallback = await conn.fetchrow(sql.query("find_available_worker"), tenant_id)
+                if fallback:
+                    worker_id = fallback["id"]
+
+        if worker_id is None:
+            raise ChatError(
+                "No available worker for this model — run the worker machine "
+                "(Models → Install Worker).",
+                code="no_worker_available",
+                status_code=503,
+            )
+
+        task_id = task_row["id"]
+
+        # Dispatch via Redis
+        if self._redis is None:
+            raise ChatError(
+                "Redis not configured — executor dispatch requires Redis",
+                code="redis_missing",
+                status_code=503,
+            )
+        from bsgateway.streams import RedisStreamManager
+
+        stream_mgr = RedisStreamManager(self._redis)
+        dispatcher = WorkerDispatcher(stream_mgr)
+        await dispatcher.dispatch_task(worker_id, task_id, executor_type, prompt)
+
+        # Mark dispatched
+        async with self._pool.acquire() as conn:
+            await conn.execute(sql.query("update_task_dispatched"), task_id, worker_id)
+
+        # Poll for result (timeout from model.extra_params or default 600s)
+        extra = model.extra_params or {}
+        timeout = int(extra.get("timeout_seconds", 600))
+        poll_interval = 1.0
+        elapsed = 0.0
+        final_row = None
+        while elapsed < timeout:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            async with self._pool.acquire() as conn:
+                final_row = await conn.fetchrow(sql.query("get_task"), task_id, tenant_id)
+            if final_row and final_row["status"] in ("done", "failed"):
+                break
+
+        if not final_row or final_row["status"] not in ("done", "failed"):
+            raise ChatError(
+                f"Executor task timed out after {timeout}s",
+                code="executor_timeout",
+                status_code=504,
+            )
+
+        if final_row["status"] == "failed":
+            raise ChatError(
+                final_row["error_message"] or "Executor failed",
+                code="executor_failed",
+                status_code=502,
+            )
+
+        # Log routing decision (fire-and-forget)
+        task = asyncio.create_task(
+            asyncio.wait_for(
+                self._log_request(tenant_id, rule_match, request_data, model),
+                timeout=30.0,
+            )
+        )
+        self._background_tasks.add(task)
+        task.add_done_callback(self._on_background_done)
+
+        return {
+            "id": f"exec-{uuid.uuid4().hex[:24]}",
+            "object": "chat.completion",
+            "model": model.model_name,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": final_row["output"] or ""},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }
 
     def _on_background_done(self, task: asyncio.Task) -> None:
         """Clean up background task and log any unhandled errors."""

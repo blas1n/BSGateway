@@ -124,11 +124,15 @@ export function RouteCard({
                 {!models.some((m) => m.model_name === card.targetModel) && (
                   <option value={card.targetModel}>{card.targetModel}</option>
                 )}
-                {models.map((m) => (
-                  <option key={m.id} value={m.model_name}>
-                    {m.model_name}
-                  </option>
-                ))}
+                {models.map((m) => {
+                  const exType =
+                    m.provider === 'executor' ? m.litellm_model.split('/', 2)[1] : null;
+                  return (
+                    <option key={m.id} value={m.model_name}>
+                      {exType ? `${m.model_name} (${exType})` : m.model_name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <span className="px-2 py-0.5 bg-on-surface-variant/10 text-on-surface-variant text-[10px] font-black rounded border border-outline-variant/10 uppercase">

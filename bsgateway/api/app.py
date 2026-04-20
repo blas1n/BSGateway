@@ -97,6 +97,20 @@ async def lifespan(app: FastAPI):
     apikey_repo = ApiKeyRepository(pool)
     await apikey_repo.init_schema()
 
+    # Executor schema (workers + executor_tasks)
+    from bsgateway.executor.sql_loader import ExecutorSqlLoader
+
+    executor_sql = ExecutorSqlLoader()
+    await execute_schema(pool, executor_sql.schema())
+
+    # Initialize RedisStreamManager if Redis is available
+    if app.state.redis:
+        from bsgateway.streams import RedisStreamManager
+
+        app.state.stream_manager = RedisStreamManager(app.state.redis)
+    else:
+        app.state.stream_manager = None
+
     logger.info("api_server_started", port=settings.api_port)
     yield
 
@@ -156,12 +170,14 @@ def create_app() -> FastAPI:
     from bsgateway.api.routers.apikeys import router as apikeys_router
     from bsgateway.api.routers.audit import router as audit_router
     from bsgateway.api.routers.chat import router as chat_router
+    from bsgateway.api.routers.execute import router as execute_router
     from bsgateway.api.routers.feedback import router as feedback_router
     from bsgateway.api.routers.intents import router as intents_router
     from bsgateway.api.routers.presets import router as presets_router
     from bsgateway.api.routers.rules import router as rules_router
     from bsgateway.api.routers.tenants import router as tenants_router
     from bsgateway.api.routers.usage import router as usage_router
+    from bsgateway.api.routers.workers import router as workers_router
     from bsgateway.mcp.router import router as mcp_router
 
     app.include_router(chat_router, prefix="/api/v1")
@@ -174,6 +190,8 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(apikeys_router, prefix="/api/v1")
     app.include_router(mcp_router, prefix="/api/v1")
+    app.include_router(execute_router, prefix="/api/v1")
+    app.include_router(workers_router, prefix="/api/v1")
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:

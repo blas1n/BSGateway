@@ -21,4 +21,10 @@ export const tenantsApi = {
     api.patch<TenantModel>(`/tenants/${tenantId}/models/${modelId}`, data),
   deleteModel: (tenantId: string, modelId: string) =>
     api.delete<void>(`/tenants/${tenantId}/models/${modelId}`),
+
+  // Per-model daily sparkline data (last N days). Missing models = all zeros.
+  getSparklines: (tenantId: string, days = 7) =>
+    api.get<Record<string, number[]>>(
+      `/tenants/${tenantId}/usage/sparklines?days=${days}`,
+    ),
 };

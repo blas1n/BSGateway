@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -157,6 +157,68 @@ class TestUsageAPI:
 
     def test_invalid_period_returns_422(self, client):
         resp = client.get(f"/api/v1/tenants/{TENANT_ID}/usage?period=invalid")
+        assert resp.status_code == 422
+
+    def test_sparklines_merges_llm_and_executor(self, client, mock_pool):
+        """GET /usage/sparklines merges routing_logs and executor_tasks, keyed by name."""
+        today = datetime.now(UTC).date()
+        llm_rows = [
+            {"day": today - timedelta(days=2), "resolved_model": "gpt-4o", "requests": 3},
+            {"day": today, "resolved_model": "gpt-4o", "requests": 1},
+            {"day": today - timedelta(days=1), "resolved_model": "claude", "requests": 2},
+        ]
+        exec_rows = [
+            {"day": today - timedelta(days=3), "resolved_model": "worker-A", "requests": 5},
+            {"day": today, "resolved_model": "worker-A", "requests": 2},
+            {"day": today, "resolved_model": "worker-B", "requests": 1},
+        ]
+
+        conn = AsyncMock()
+        conn.fetch = AsyncMock(side_effect=[llm_rows, exec_rows])
+
+        @asynccontextmanager
+        async def mock_acquire():
+            yield conn
+
+        mock_pool.acquire = mock_acquire
+
+        with patch("bsgateway.api.routers.usage._sql") as mock_sql:
+            mock_sql.query.side_effect = lambda q: q
+            resp = client.get(f"/api/v1/tenants/{TENANT_ID}/usage/sparklines?days=7")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        # Last bucket (index 6) is today
+        assert data["gpt-4o"][4] == 3  # 2 days ago
+        assert data["gpt-4o"][6] == 1  # today
+        assert data["claude"][5] == 2  # 1 day ago
+        assert data["worker-A"][3] == 5  # 3 days ago
+        assert data["worker-A"][6] == 2  # today
+        assert data["worker-B"][6] == 1  # today
+        assert len(data["gpt-4o"]) == 7
+
+    def test_sparklines_empty_returns_empty_dict(self, client, mock_pool):
+        """When no activity in window, return {} (frontend treats missing as zeros)."""
+        conn = AsyncMock()
+        conn.fetch = AsyncMock(side_effect=[[], []])
+
+        @asynccontextmanager
+        async def mock_acquire():
+            yield conn
+
+        mock_pool.acquire = mock_acquire
+
+        with patch("bsgateway.api.routers.usage._sql") as mock_sql:
+            mock_sql.query.side_effect = lambda q: q
+            resp = client.get(f"/api/v1/tenants/{TENANT_ID}/usage/sparklines")
+
+        assert resp.status_code == 200
+        assert resp.json() == {}
+
+    def test_sparklines_rejects_out_of_range_days(self, client):
+        resp = client.get(f"/api/v1/tenants/{TENANT_ID}/usage/sparklines?days=0")
+        assert resp.status_code == 422
+        resp = client.get(f"/api/v1/tenants/{TENANT_ID}/usage/sparklines?days=999")
         assert resp.status_code == 422
 
     def test_daily_breakdown_sorted(self, client, mock_pool):

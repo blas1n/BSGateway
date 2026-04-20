@@ -40,6 +40,19 @@ docker compose up
   serialization, hydration with stale-skip).
 - **Data collection**: PostgreSQL via asyncpg, SQL in `.sql` files (not ORM)
 - **Auth**: Supabase JWT via `bsvibe-auth` package — tenant mapping from `app_metadata.tenant_id`
+- **Executor workers** (`bsgateway/executor/`, `worker/`): remote machines that run
+  Claude Code / Codex CLI. Registered workers are auto-inserted into `tenant_models`
+  with `provider='executor'` and `extra_params.worker_id` pinning dispatch to that
+  specific worker. Routing rules target worker names just like LLM models.
+  - **Install token**: admin mints via `POST /api/v1/workers/install-token`, shares
+    with worker machines. Worker registration uses `X-Install-Token` header.
+    One-line install: `curl http://<gateway>/api/v1/workers/install.sh | bash`.
+  - **Dispatch**: `ChatService._execute_via_worker` creates an `executor_tasks` row,
+    publishes to `tasks:worker:{worker_id}` Redis stream, polls for result.
+  - Worker package is standalone (no bsgateway dependency) — `worker/pyproject.toml`.
+- **Sparkline usage**: `GET /api/v1/tenants/{id}/usage/sparklines?days=7` returns
+  per-model per-day request counts for the Model Registry page. Merges
+  `routing_logs.resolved_model` (LLM) and `executor_tasks JOIN workers.name` (executor).
 
 ## Conventions
 
@@ -65,3 +78,9 @@ docker compose up
 | `bsgateway/api/deps.py` | GatewayAuthContext, auth dependencies (BSVibe-Auth) |
 | `bsgateway/routing/sql/` | schema.sql + queries.sql (named query pattern) |
 | `bsgateway/embedding/` | EmbeddingProvider protocol, LiteLLM impl, per-tenant factory, stale-skip hydration |
+| `bsgateway/executor/` | Executor registry, dispatcher, install token helpers, SQL schema for `workers` + `executor_tasks` |
+| `bsgateway/streams.py` | Redis Streams abstraction (`publish`/`consume`/`acknowledge`) |
+| `bsgateway/api/routers/workers.py` | Worker register/heartbeat/poll/result, install token CRUD, `install.sh`/`source.tar.gz` serving |
+| `bsgateway/api/routers/execute.py` | Async task endpoints (`POST /execute`, `GET /tasks/{id}`) |
+| `bsgateway/api/routers/usage.py` | Daily usage + sparkline endpoint |
+| `worker/` | Standalone worker package (httpx + pydantic-settings) — `main.py`, `executors.py`, `install.sh` |
