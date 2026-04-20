@@ -17,6 +17,11 @@ class ExecutorSettings(BaseSettings):
     # Codex
     codex_default_model: str = "openai/codex-mini"
 
+    # Worker dispatch loop (ChatService._execute_via_worker)
+    worker_default_timeout_seconds: int = 600
+    worker_poll_interval_seconds: float = 1.0
+    routing_log_timeout_seconds: float = 30.0
+
     model_config = SettingsConfigDict(env_file=".env", env_prefix="EXECUTOR_", extra="ignore")
 
 

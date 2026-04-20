@@ -19,6 +19,7 @@ from bsgateway.core.utils import parse_jsonb_value, safe_json_loads
 from bsgateway.embedding.provider import build_provider
 from bsgateway.embedding.serialization import hydrate_intent_definitions
 from bsgateway.embedding.settings import EmbeddingSettings
+from bsgateway.executor.config import executor_settings
 from bsgateway.executor.dispatcher import WorkerDispatcher
 from bsgateway.executor.sql_loader import ExecutorSqlLoader
 from bsgateway.routing.collector import SqlLoader
@@ -300,11 +301,11 @@ class ChatService:
 
         response = await litellm.acompletion(**litellm_kwargs)
 
-        # Fire-and-forget: log routing decision + budget tracking (30s timeout)
+        # Fire-and-forget: log routing decision + budget tracking
         task = asyncio.create_task(
             asyncio.wait_for(
                 self._log_request(tenant_id, rule_match, request_data, model),
-                timeout=30.0,
+                timeout=executor_settings.routing_log_timeout_seconds,
             )
         )
         self._background_tasks.add(task)
@@ -359,7 +360,11 @@ class ChatService:
         await dispatcher.dispatch_task(worker_id, task_id, executor_type, prompt)
 
         final_row = await self._await_task_completion(
-            task_id, tenant_id, timeout_seconds=int(extra.get("timeout_seconds", 600))
+            task_id,
+            tenant_id,
+            timeout_seconds=int(
+                extra.get("timeout_seconds", executor_settings.worker_default_timeout_seconds)
+            ),
         )
 
         if final_row["status"] == "failed":
@@ -372,7 +377,7 @@ class ChatService:
         log_task = asyncio.create_task(
             asyncio.wait_for(
                 self._log_request(tenant_id, rule_match, request_data, model),
-                timeout=30.0,
+                timeout=executor_settings.routing_log_timeout_seconds,
             )
         )
         self._background_tasks.add(log_task)
@@ -417,9 +422,16 @@ class ChatService:
         task_id: UUID,
         tenant_id: UUID,
         timeout_seconds: int,
-        poll_interval: float = 1.0,
+        poll_interval: float | None = None,
     ) -> asyncpg.Record:
-        """Poll executor_tasks until status transitions out of pending/dispatched."""
+        """Poll executor_tasks until status transitions out of pending/dispatched.
+
+        TODO: replace DB polling with a Redis pub/sub channel the worker
+        /result handler writes to (e.g. ``task:{id}:done``). Cuts up to
+        ``timeout/poll_interval`` DB hits per task under load.
+        """
+        if poll_interval is None:
+            poll_interval = executor_settings.worker_poll_interval_seconds
         elapsed = 0.0
         while elapsed < timeout_seconds:
             await asyncio.sleep(poll_interval)

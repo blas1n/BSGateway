@@ -2,6 +2,11 @@
 
 Kept self-contained so the worker package doesn't depend on the full
 ``bsgateway`` backend (which pulls in asyncpg, fastapi, etc.).
+
+TODO: this file twins bsgateway/executor/{claude_code,codex}.py for the
+subprocess logic. Keep them in sync when changing retry/timeout
+behavior. A future refactor could extract a shared stdlib-only
+``executor_core`` package consumed by both.
 """
 
 from __future__ import annotations
