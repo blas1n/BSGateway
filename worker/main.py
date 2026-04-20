@@ -187,14 +187,14 @@ async def poll_and_execute() -> None:
 
                 # Only poll if we have capacity
                 if len(in_flight) >= max_parallel:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(settings.capacity_wait_seconds)
                     continue
 
                 slots = max_parallel - len(in_flight)
                 res = await client.post(
                     "/api/v1/workers/poll",
                     headers=headers,
-                    params={"count": min(slots, 5)},
+                    params={"count": min(slots, settings.poll_batch_max)},
                 )
                 res.raise_for_status()
                 tasks: list[dict[str, Any]] = res.json()

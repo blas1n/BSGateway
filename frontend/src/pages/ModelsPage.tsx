@@ -141,6 +141,8 @@ BSGATEWAY_INSTALL_TOKEN=${tokenPlaceholder} ~/.bsgateway-worker/bsgateway-worker
   // Build a 7-bucket normalized sparkline for a given model name.
   // ``raw`` is an array of daily request counts (index 0 = oldest, last = today).
   // Returns percent heights (3..100) per bucket for visual display.
+  // TODO: extract a <Sparkline bars color enabled /> component when a third
+  // sparkline consumer appears (currently only LLM and executor worker cards).
   const sparkBarsFor = (name: string): { h: number; active: boolean }[] => {
     const raw: number[] = sparklines?.[name] ?? [];
     const len = 7;

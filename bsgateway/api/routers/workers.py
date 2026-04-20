@@ -54,6 +54,14 @@ async def _invalidate_models_cache(request: Request, tenant_id: UUID) -> None:
         await cache.delete(cache_key_models(str(tenant_id)))
 
 
+# TODO: index `tenants.settings->>'worker_install_token_hash'` once tenant
+# count grows — the install-token lookup (resolve_install_token_tenant)
+# otherwise does a seq scan. Partial expression index:
+#   CREATE INDEX tenants_worker_install_token_hash
+#   ON tenants ((settings->>'worker_install_token_hash'))
+#   WHERE settings ? 'worker_install_token_hash';
+
+
 def _build_worker_tarball() -> bytes:
     """Build worker source tarball. Cached after first call."""
     global _cached_tarball
