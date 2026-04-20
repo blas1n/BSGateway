@@ -36,7 +36,7 @@ def detect_capabilities() -> list[str]:
 # ─── Executor selection ──────────────────────────────────────────────
 
 
-def select_executor(executor_type: str, skip_permissions: bool = True) -> ExecutorProtocol:
+def select_executor(executor_type: str) -> ExecutorProtocol:
     """Create an executor instance by type. Raises ValueError if unknown."""
     return create_executor(executor_type)
 
@@ -156,7 +156,7 @@ async def poll_and_execute() -> None:
     # Auto-detect executor: prefer claude_code
     capabilities = detect_capabilities()
     executor_type = capabilities[0] if capabilities else "claude_code"
-    executor = select_executor(executor_type, skip_permissions=settings.skip_permissions)
+    executor = select_executor(executor_type)
 
     logger.info(
         "worker_starting",

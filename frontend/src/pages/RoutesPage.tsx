@@ -8,6 +8,7 @@ import { EmbeddingSettingsCard } from '../components/rules/EmbeddingSettingsCard
 import { DefaultFallbackCard } from '../components/rules/DefaultFallbackCard';
 import { routesApi } from '../api/routes';
 import type { TenantModel } from '../types/api';
+import { modelDisplayLabel } from '../utils/modelLabel';
 
 interface CreateFormData {
   description: string;
@@ -114,18 +115,11 @@ function CreateModal({
                 onChange={(e) => setFormData({ ...formData, targetModel: e.target.value })}
                 className="w-full bg-surface-container-highest border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/40"
               >
-                {models.map((m) => {
-                  let providerLabel = m.provider;
-                  if (m.provider === 'executor') {
-                    const exType = m.litellm_model.split('/', 2)[1];
-                    if (exType) providerLabel = exType;
-                  }
-                  return (
-                    <option key={m.id} value={m.model_name}>
-                      {m.model_name} ({providerLabel})
-                    </option>
-                  );
-                })}
+                {models.map((m) => (
+                  <option key={m.id} value={m.model_name}>
+                    {modelDisplayLabel(m)}
+                  </option>
+                ))}
               </select>
             ) : (
               <div className="bg-surface-container-highest rounded-xl p-4 text-sm text-on-surface-variant">

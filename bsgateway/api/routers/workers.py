@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import secrets
 import tarfile
 from pathlib import Path
@@ -21,6 +22,8 @@ from bsgateway.api.deps import (
     get_auth_context,
     get_pool,
 )
+from bsgateway.core.cache import cache_key_models
+from bsgateway.core.utils import parse_jsonb_value
 from bsgateway.executor.install_token import (
     generate_install_token,
     has_install_token,
@@ -29,18 +32,26 @@ from bsgateway.executor.install_token import (
     set_install_token_hash,
 )
 from bsgateway.executor.sql_loader import ExecutorSqlLoader
+from bsgateway.routing.collector import SqlLoader as RoutingSqlLoader
 from bsgateway.streams import RedisStreamManager
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 _sql = ExecutorSqlLoader()
+_routing_sql = RoutingSqlLoader()
 
 # Worker source lives next to the bsgateway package (./worker/)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _WORKER_DIR = _REPO_ROOT / "worker"
 _INSTALL_SCRIPT = _WORKER_DIR / "install.sh"
 _cached_tarball: bytes | None = None
+
+
+async def _invalidate_models_cache(request: Request, tenant_id: UUID) -> None:
+    cache = getattr(request.app.state, "cache", None)
+    if cache:
+        await cache.delete(cache_key_models(str(tenant_id)))
 
 
 def _build_worker_tarball() -> bytes:
@@ -123,7 +134,6 @@ class WorkerRegisterBody(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     labels: list[str] = Field(default_factory=list)
     capabilities: list[str] = Field(default_factory=list)
-    install_token: str | None = None
 
 
 class WorkerRegisterResponse(BaseModel):
@@ -231,14 +241,9 @@ async def register_worker(
     Requires ``X-Install-Token`` header — admins mint one via
     ``POST /api/v1/workers/install-token`` and share it with worker machines.
     """
-    import json
-
     install_token = request.headers.get("X-Install-Token", "")
     if not install_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing X-Install-Token header",
-        )
+        raise HTTPException(status_code=401, detail="Missing X-Install-Token header")
 
     pool = get_pool(request)
     tenant_id = await resolve_install_token_tenant(pool, install_token)
@@ -246,43 +251,28 @@ async def register_worker(
         raise HTTPException(status_code=401, detail="Invalid install token")
 
     token = secrets.token_urlsafe(32)
-    token_hash = _hash_token(token)
-
-    # Pick the primary executor type for the auto-created model
     executor_type = (body.capabilities or ["claude_code"])[0]
 
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            row = await conn.fetchrow(
-                _sql.query("create_worker"),
-                tenant_id,
-                body.name,
-                json.dumps(body.labels),
-                json.dumps(body.capabilities),
-                token_hash,
-            )
-            # Each worker is also a routable model. Rules and chat requests
-            # can target this worker by its name via the standard
-            # ``tenant_models`` table. ``extra_params.worker_id`` pins
-            # dispatch to THIS specific worker.
-            from bsgateway.routing.collector import SqlLoader as _RoutingSql
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            _sql.query("create_worker"),
+            tenant_id,
+            body.name,
+            json.dumps(body.labels),
+            json.dumps(body.capabilities),
+            _hash_token(token),
+        )
+        # Each worker is also a routable tenant_model, pinned to this specific
+        # worker_id so rules + chat requests dispatch directly to it.
+        await conn.fetchrow(
+            _routing_sql.query("upsert_worker_model"),
+            tenant_id,
+            body.name,
+            f"executor/{executor_type}",
+            json.dumps({"worker_id": str(row["id"])}),
+        )
 
-            _routing_sql = _RoutingSql()
-            await conn.fetchrow(
-                _routing_sql.query("upsert_worker_model"),
-                tenant_id,
-                body.name,
-                f"executor/{executor_type}",
-                json.dumps({"worker_id": str(row["id"])}),
-            )
-
-    # Invalidate the tenant_models cache so the new worker-model shows up
-    # immediately in Models and Rules UI.
-    cache = getattr(request.app.state, "cache", None)
-    if cache:
-        from bsgateway.core.cache import cache_key_models
-
-        await cache.delete(cache_key_models(str(tenant_id)))
+    await _invalidate_models_cache(request, tenant_id)
 
     logger.info(
         "worker_registered",
@@ -354,16 +344,12 @@ async def list_workers(
     pool = get_pool(request)
     async with pool.acquire() as conn:
         rows = await conn.fetch(_sql.query("list_workers"), auth.tenant_id)
-    # asyncpg returns JSONB columns as text — decode to lists for the client.
-    from bsgateway.core.utils import safe_json_loads
-
     result = []
     for r in rows:
         row = dict(r)
         for k in ("labels", "capabilities"):
-            if isinstance(row.get(k), str):
-                parsed = safe_json_loads(row[k])
-                row[k] = parsed if isinstance(parsed, list) else []
+            val = parse_jsonb_value(row.get(k))
+            row[k] = val if isinstance(val, list) else []
         result.append(row)
     return result
 
@@ -391,9 +377,6 @@ async def delete_worker(
 
         async with conn.transaction():
             await conn.execute(_sql.query("deactivate_worker"), worker_id, auth.tenant_id)
-            from bsgateway.routing.collector import SqlLoader as _RoutingSql
-
-            _routing_sql = _RoutingSql()
             await conn.execute(
                 _routing_sql.query("delete_worker_model"),
                 auth.tenant_id,
@@ -401,10 +384,6 @@ async def delete_worker(
                 str(worker_id),
             )
 
-    cache = getattr(request.app.state, "cache", None)
-    if cache:
-        from bsgateway.core.cache import cache_key_models
-
-        await cache.delete(cache_key_models(str(auth.tenant_id)))
+    await _invalidate_models_cache(request, auth.tenant_id)
 
     logger.info("worker_deregistered", worker_id=str(worker_id), tenant_id=str(auth.tenant_id))

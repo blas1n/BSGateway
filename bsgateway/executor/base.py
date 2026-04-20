@@ -14,7 +14,7 @@ class ExecutionResult:
     stdout: str = ""
     stderr: str = ""
     error_message: str | None = None
-    error_category: Literal["environment", "tool", "rate_limit", ""] = ""
+    error_category: Literal["environment", "tool", ""] = ""
 
 
 @runtime_checkable

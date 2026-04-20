@@ -198,7 +198,7 @@ def test_select_executor_claude() -> None:
     """select_executor returns ClaudeCodeExecutor for claude_code."""
     from worker.main import select_executor
 
-    executor = select_executor("claude_code", skip_permissions=True)
+    executor = select_executor("claude_code")
     from worker.executors import ClaudeCodeExecutor
 
     assert isinstance(executor, ClaudeCodeExecutor)
@@ -208,7 +208,7 @@ def test_select_executor_codex() -> None:
     """select_executor returns CodexExecutor for codex."""
     from worker.main import select_executor
 
-    executor = select_executor("codex", skip_permissions=True)
+    executor = select_executor("codex")
     from worker.executors import CodexExecutor
 
     assert isinstance(executor, CodexExecutor)
