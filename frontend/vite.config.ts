@@ -9,7 +9,12 @@ export default defineConfig({
       ? process.env.VITE_ALLOWED_HOSTS.split(',').map((h) => h.trim())
       : true,
     proxy: {
-      '/api': process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+      '/api': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+        // Keep the original Host header so the backend can inject the
+        // reachable frontend origin into worker install.sh.
+        changeOrigin: false,
+      },
     },
     headers: {
       'X-Content-Type-Options': 'nosniff',

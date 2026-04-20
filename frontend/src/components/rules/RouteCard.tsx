@@ -3,6 +3,7 @@ import type { TenantModel } from '../../types/api';
 import type { RouteCard as RouteCardType } from '../../api/routes';
 import { routesApi } from '../../api/routes';
 import { useDeleteConfirm } from '../../hooks/useDeleteConfirm';
+import { modelDisplayLabel } from '../../utils/modelLabel';
 
 interface RouteCardProps {
   card: RouteCardType;
@@ -126,7 +127,7 @@ export function RouteCard({
                 )}
                 {models.map((m) => (
                   <option key={m.id} value={m.model_name}>
-                    {m.model_name}
+                    {modelDisplayLabel(m)}
                   </option>
                 ))}
               </select>

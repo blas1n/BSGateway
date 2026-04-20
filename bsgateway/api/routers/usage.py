@@ -134,3 +134,60 @@ async def get_usage(
         by_rule=by_rule,
         daily_breakdown=daily_breakdown,
     )
+
+
+@router.get("/sparklines", summary="Per-model daily request counts for sparkline charts")
+async def get_sparklines(
+    tenant_id: UUID,
+    request: Request,
+    auth: GatewayAuthContext = Depends(require_tenant_access),
+    days: int = Query(7, ge=1, le=90),
+) -> dict[str, list[int]]:
+    """Return per-model per-day request counts for the last ``days`` days.
+
+    Combines LLM traffic (``routing_logs.resolved_model``) and executor
+    traffic (``executor_tasks`` joined with ``workers.name``). Returns a
+    fixed-length array per model, where index ``0`` is the oldest day
+    (``days-1`` days ago) and index ``days-1`` is today.
+
+    Models with zero activity in the window are omitted — the caller
+    should treat absence as "all zeros".
+    """
+    pool = get_pool(request)
+    today = datetime.now(UTC).date()
+    start = today - timedelta(days=days - 1)
+    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=UTC)
+    end_dt = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+
+    async def _fetch_llm():
+        async with pool.acquire() as conn:
+            return await conn.fetch(_sql.query("usage_by_model"), tenant_id, start_dt, end_dt)
+
+    async def _fetch_exec():
+        async with pool.acquire() as conn:
+            return await conn.fetch(
+                "SELECT DATE(t.created_at) AS day, w.name AS resolved_model, "
+                "       COUNT(*) AS requests "
+                "FROM executor_tasks t JOIN workers w ON t.worker_id = w.id "
+                "WHERE t.tenant_id = $1 AND t.created_at >= $2 AND t.created_at < $3 "
+                "GROUP BY DATE(t.created_at), w.name",
+                tenant_id,
+                start_dt,
+                end_dt,
+            )
+
+    llm_rows, exec_rows = await asyncio.gather(_fetch_llm(), _fetch_exec())
+
+    day_index = {start + timedelta(days=i): i for i in range(days)}
+    result: dict[str, list[int]] = {}
+    for row in list(llm_rows) + list(exec_rows):
+        name = row["resolved_model"]
+        if not name:
+            continue
+        idx = day_index.get(row["day"])
+        if idx is None:
+            continue
+        arr = result.setdefault(name, [0] * days)
+        arr[idx] += int(row["requests"])
+
+    return result
