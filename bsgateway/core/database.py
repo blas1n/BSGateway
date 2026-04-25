@@ -8,12 +8,29 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 _pool: asyncpg.Pool | None = None
-# Guards _pool create/close. asyncpg's create_pool is awaitable and can
-# yield to the event loop, so concurrent first-time callers (or a parallel
-# create + close) could race and produce multiple pools / leak connections
-# (audit issue H14). One process-wide asyncio.Lock serialises every read
-# of _pool that may mutate it.
-_pool_lock = asyncio.Lock()
+# Guards _pool create/close. asyncpg.create_pool is awaitable and can
+# yield to the event loop, so concurrent first-time callers (or a
+# parallel create + close) could race and produce multiple pools / leak
+# connections (audit issue H14). The lock is bound lazily to whichever
+# loop is running so test suites that spin up multiple event loops do
+# not trip "lock bound to a different event loop".
+_pool_lock: asyncio.Lock | None = None
+_pool_lock_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_pool_lock() -> asyncio.Lock:
+    """Return an asyncio.Lock bound to the current running loop.
+
+    Creates a fresh lock on first call (or when the running loop has
+    changed since the last call). Every coroutine that mutates ``_pool``
+    must funnel through this lock.
+    """
+    global _pool_lock, _pool_lock_loop
+    loop = asyncio.get_running_loop()
+    if _pool_lock is None or _pool_lock_loop is not loop:
+        _pool_lock = asyncio.Lock()
+        _pool_lock_loop = loop
+    return _pool_lock
 
 
 async def get_pool(database_url: str, min_size: int = 2, max_size: int = 10) -> asyncpg.Pool:
@@ -37,7 +54,7 @@ async def get_pool(database_url: str, min_size: int = 2, max_size: int = 10) -> 
     if _pool is not None and not _pool.is_closing():
         return _pool
 
-    async with _pool_lock:
+    async with _get_pool_lock():
         # Re-check inside the lock — another coroutine may have created it
         # while we were waiting.
         if _pool is None or _pool.is_closing():
@@ -53,7 +70,7 @@ async def close_pool() -> None:
     cannot race a cold first request and leave an orphaned pool behind.
     """
     global _pool
-    async with _pool_lock:
+    async with _get_pool_lock():
         if _pool is not None and not _pool.is_closing():
             await _pool.close()
             _pool = None
