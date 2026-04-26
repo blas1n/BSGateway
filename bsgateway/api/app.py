@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
 
 import structlog
+from bsvibe_fastapi import add_cors_middleware, make_health_router
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -220,23 +220,24 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — configurable via CORS_ALLOWED_ORIGINS env var
-    if settings.cors_allowed_origins:
-        cors_origins = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
-    else:
-        cors_origins = [f"http://localhost:{settings.api_port}"]
+    # CORS — bsvibe_fastapi.add_cors_middleware honours
+    # FastApiSettings.cors_allowed_origins (Annotated[list[str], NoDecode]
+    # + parse_csv_list field_validator). When the deployer provides no
+    # value the field falls back to FastApiSettings's default
+    # (["http://localhost:3500"]); BSGateway prefers a port-aware
+    # localhost so we keep the local override here.
+    if settings.cors_allowed_origins == ["http://localhost:3500"]:
+        # Default-only branch: emit the legacy warning and use a
+        # port-aware origin so the dashboard still talks to the API.
+        local_origin = f"http://localhost:{settings.api_port}"
         logger.warning(
             "cors_fallback_to_localhost",
-            origins=cors_origins,
+            origins=[local_origin],
             hint="Set CORS_ALLOWED_ORIGINS for production",
         )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type"],
-    )
+        add_cors_middleware(app, settings, allow_origins=[local_origin])
+    else:
+        add_cors_middleware(app, settings)
 
     from bsgateway.api.routers.apikeys import router as apikeys_router
     from bsgateway.api.routers.audit import router as audit_router
@@ -264,9 +265,12 @@ def create_app() -> FastAPI:
     app.include_router(execute_router, prefix="/api/v1")
     app.include_router(workers_router, prefix="/api/v1")
 
-    @app.get("/health", tags=["health"])
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    # /health — shared liveness probe (always 200, no DI). Phase A Batch 5
+    # adopts ``bsvibe_fastapi.make_health_router`` for parity across the
+    # four products. ``/health/ready`` (deep readiness with DB+Redis
+    # checks + per-dependency status keys) is BSGateway-specific and
+    # stays inline — production probes already scrape its envelope.
+    app.include_router(make_health_router())
 
     @app.get("/health/ready", tags=["health"])
     async def health_ready() -> JSONResponse:

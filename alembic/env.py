@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from logging.config import fileConfig
 
+from bsvibe_sqlalchemy import resolve_sync_alembic_url
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
@@ -38,6 +39,12 @@ def _resolve_database_url() -> str:
     2. ``COLLECTOR_DATABASE_URL`` env var (matches the gateway runtime).
     3. ``Settings().collector_database_url`` (loads ``.env`` via
        pydantic-settings).
+
+    Phase A Batch 5: the asyncpg → psycopg sync rewrite is delegated to
+    :func:`bsvibe_sqlalchemy.resolve_sync_alembic_url` so all four products
+    share the same URL normalisation. The lookup tier remains
+    BSGateway-specific because we honour ``COLLECTOR_DATABASE_URL`` (the
+    gateway-runtime alias) before falling back to the typed Settings.
     """
     raw = os.environ.get("DATABASE_URL") or os.environ.get("COLLECTOR_DATABASE_URL")
     if not raw:
@@ -50,14 +57,8 @@ def _resolve_database_url() -> str:
             "DATABASE_URL / COLLECTOR_DATABASE_URL must be set for Alembic. "
             "Set it in .env or pass via the environment."
         )
-    # Normalise asyncpg → psycopg (sync v3) for Alembic. Migrations are
-    # DDL only, so the driver is incidental — but it must be a sync DBAPI
-    # because Alembic's run_migrations helpers do not do asyncio.
-    if raw.startswith("postgresql+asyncpg://"):
-        raw = raw.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    elif raw.startswith("postgresql://"):
-        raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
-    return raw
+    # Driver-agnostic normaliser shared with BSNexus / BSage / BSupervisor.
+    return resolve_sync_alembic_url(raw)
 
 
 # We do NOT use SQLAlchemy ORM models — migrations are written by hand to

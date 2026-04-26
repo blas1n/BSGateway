@@ -5,6 +5,23 @@
  * The previous Tailwind v3 `tailwind.config.js` is replaced by the @theme
  * block below — names match exactly so existing JSX (`bg-surface`,
  * `text-on-surface`, `bg-primary-container`, …) keeps working unchanged.
+ *
+ * Phase A Batch 5 — design token source of truth:
+ * The Material 3 surface/role tokens (`--color-primary*`,
+ * `--color-secondary*`, `--color-tertiary*`, `--color-error*`,
+ * `--color-surface*`, `--color-on-*`, `--color-outline*`,
+ * `--color-background*`, `--color-inverse-*`, `--color-surface-tint`)
+ * mirror `@bsvibe/design-tokens` `m3.*` namespace verbatim
+ * (~/Works/bsvibe-frontend-lib/main/packages/design-tokens/src/index.ts
+ * lines 180-223). Drift between the two surfaces breaks every dashboard
+ * that ships `bg-primary-container`, `text-on-surface`, etc.
+ *
+ * Drift guard: `bsgateway/tests/test_design_tokens_drift.py` extracts the
+ * values from this file and asserts they equal the canonical TS export.
+ * To pull tokens via `@import "@bsvibe/design-tokens/css"` instead of
+ * inlining them, the consumer needs registry credentials (Lockin §3 #12,
+ * GitHub Packages PAT — pending user action). Until then this file is
+ * the keep-in-sync mirror; the drift test catches accidental edits.
  */
 @import "tailwindcss";
 

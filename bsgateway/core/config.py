@@ -1,14 +1,29 @@
+"""BSGateway settings.
+
+Phase A Batch 5: extends :class:`bsvibe_fastapi.FastApiSettings` so the
+CORS / CSV-list / structlog plumbing matches the four-product baseline
+(BSupervisor PR #13 §M18). BSGateway-specific knobs (gateway YAML
+path, encryption key, BSupervisor service-account credentials, …)
+remain on this subclass.
+
+The legacy ``cors_allowed_origins: str`` field is replaced by the
+shared ``Annotated[list[str], NoDecode]`` shape inherited from
+:class:`FastApiSettings`. Existing deployments that ship
+``CORS_ALLOWED_ORIGINS=http://a,http://b`` keep working unchanged.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import structlog
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from bsvibe_fastapi import FastApiSettings
+from pydantic_settings import SettingsConfigDict
 
 _config_logger = structlog.get_logger(__name__)
 
 
-class Settings(BaseSettings):
+class Settings(FastApiSettings):
     """BSGateway configuration via environment variables."""
 
     gateway_config_path: Path = Path("gateway.yaml")
@@ -46,13 +61,18 @@ class Settings(BaseSettings):
     # "closed" → block runs when BSupervisor is unreachable.
     bsupervisor_audit_fail_mode: str = "open"
 
-    # CORS (comma-separated list of allowed origins, e.g. "http://localhost:5173,https://app.example.com")
-    cors_allowed_origins: str = ""
-
     # Frontend dist directory (for serving dashboard static files)
     frontend_dist_dir: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # FastApiSettings.cors_allowed_origins is Annotated[list[str], NoDecode]
+    # with a CSV field_validator. Override the default to "" → [] (legacy
+    # behaviour: when unset, fall back to localhost in app.create_app).
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     @property
     def encryption_key_bytes(self) -> bytes:

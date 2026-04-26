@@ -15,7 +15,12 @@ dependencies = [
     "redis>=5.0.0",
     "httpx>=0.27.0",
     "bsvibe-auth[fastapi] @ git+https://github.com/BSVibe/BSVibe-Auth.git@v0.4.0#subdirectory=python",
-    "bsvibe-authz @ git+https://github.com/BSVibe/bsvibe-python.git@feat/bsvibe-authz-impl#subdirectory=packages/bsvibe-authz",
+    # Phase A Batch 5 — pin all bsvibe-python packages to integration/phase-a
+    # (the unified ref containing core/fastapi/sqlalchemy/authz/alerts).
+    "bsvibe-core @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-core",
+    "bsvibe-fastapi @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-fastapi",
+    "bsvibe-sqlalchemy @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-sqlalchemy",
+    "bsvibe-authz @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-authz",
     "alembic>=1.13.0",
     "sqlalchemy>=2.0.0",
     "psycopg[binary]>=3.1.0",
