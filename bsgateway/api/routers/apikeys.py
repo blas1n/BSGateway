@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from bsvibe_audit.events.base import AuditActor
+from bsvibe_audit.events.gateway import ApiKeyIssued, ApiKeyRevoked
 from fastapi import APIRouter, Depends, Request, status
 
 from bsgateway.api.deps import (
@@ -16,6 +18,7 @@ from bsgateway.apikey.models import (
     ApiKeyInfoResponse,
 )
 from bsgateway.apikey.service import ApiKeyService
+from bsgateway.audit_publisher import emit_event
 
 router = APIRouter(prefix="/tenants/{tenant_id}/api-keys", tags=["api-keys"])
 
@@ -44,6 +47,23 @@ async def create_api_key(
         body.name,
         scopes=body.scopes,
         expires_in_days=body.expires_in_days,
+    )
+    # Phase Audit Batch 2 — gateway.api_key.issued. Emitted post-create
+    # (best-effort): the raw key is *not* in the payload (only id,
+    # prefix, name, scopes) so audit logs never carry a usable secret.
+    await emit_event(
+        request.app.state,
+        ApiKeyIssued(
+            actor=AuditActor(type="user", id=str(_auth.identity.id), email=_auth.identity.email),
+            tenant_id=str(tenant_id),
+            data={
+                "key_id": str(result.id),
+                "key_prefix": result.key_prefix,
+                "name": result.name,
+                "scopes": list(result.scopes),
+                "expires_in_days": body.expires_in_days,
+            },
+        ),
     )
     return ApiKeyCreatedResponse.model_validate(result)
 
@@ -78,3 +98,12 @@ async def revoke_api_key(
 ) -> None:
     svc = _get_apikey_service(request)
     await svc.revoke_key(key_id, tenant_id)
+    # Phase Audit Batch 2 — gateway.api_key.revoked.
+    await emit_event(
+        request.app.state,
+        ApiKeyRevoked(
+            actor=AuditActor(type="user", id=str(_auth.identity.id), email=_auth.identity.email),
+            tenant_id=str(tenant_id),
+            data={"key_id": str(key_id)},
+        ),
+    )

@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from bsgateway.audit.repository import AuditRepository
+from bsgateway.audit_publisher import build_audit_outbox
 from bsgateway.core.cache import CacheManager
 from bsgateway.core.config import settings
 from bsgateway.core.database import close_pool, execute_schema, get_pool
@@ -82,9 +83,17 @@ async def lifespan(app: FastAPI):
     # patch in the cache after CacheManager is constructed.
     if app.state.cache is not None:
         try:
+            from bsgateway.routing.cache_classifier import CachingClassifier
             from bsgateway.routing.hook import proxy_handler_instance
 
             proxy_handler_instance.attach_cache(app.state.cache)
+            # Phase Audit Batch 2 — once the cache wrapper is in place,
+            # plumb app.state through so sampled cache hits can emit
+            # ``gateway.classifier.cache_hit``. Idempotent if the wrapping
+            # was skipped (e.g. classifier strategy != static).
+            classifier = getattr(proxy_handler_instance, "classifier", None)
+            if isinstance(classifier, CachingClassifier):
+                classifier.attach_audit_state(app.state)
         except Exception:
             logger.warning("classifier_cache_attach_failed", exc_info=True)
 
@@ -135,6 +144,36 @@ async def lifespan(app: FastAPI):
             "bsupervisor_disabled",
             reason="bsupervisor_audit_enabled=False or credentials missing",
         )
+
+    # Phase Audit Batch 2 — bsvibe-audit outbox emitter + (optional) relay.
+    # The emitter is the in-process contract: each gateway.* event goes
+    # into the audit_outbox via SQLAlchemy. The relay drains the outbox
+    # to BSVibe-Auth's `/api/audit/events`. Both default off — the
+    # operator opts in via BSVIBE_AUDIT_OUTBOX_ENABLED + BSVIBE_AUTH_AUDIT_URL.
+    emitter, audit_session_factory = build_audit_outbox(
+        enabled=settings.bsvibe_audit_outbox_enabled,
+        collector_database_url=settings.collector_database_url or "",
+    )
+    app.state.audit_emitter = emitter
+    app.state.audit_outbox_session_factory = audit_session_factory
+    app.state.audit_outbox_relay = None
+    if emitter is not None and audit_session_factory is not None:
+        try:
+            from bsvibe_audit import AuditSettings, OutboxRelay
+
+            audit_settings = AuditSettings()
+            relay = OutboxRelay.from_settings(
+                audit_settings,
+                session_factory=audit_session_factory,
+            )
+            await relay.start()
+            app.state.audit_outbox_relay = relay
+            logger.info(
+                "audit_outbox_relay_started",
+                relay_enabled=audit_settings.relay_enabled,
+            )
+        except Exception:
+            logger.warning("audit_outbox_relay_start_failed", exc_info=True)
 
     # Initialize schemas — routing_logs must exist first (tenant_schema ALTERs it)
     routing_sql = SqlLoader()
@@ -198,6 +237,17 @@ async def lifespan(app: FastAPI):
         await proxy_handler_instance.aclose()
     except Exception:
         logger.warning("router_aclose_failed", exc_info=True)
+
+    # Phase Audit Batch 2 — drain the OutboxRelay before tearing down the
+    # SQLAlchemy engine. Failures here are best-effort: shutdown is more
+    # important than draining the last few audit rows (the relay's own
+    # retry on next boot will pick them up).
+    relay = getattr(app.state, "audit_outbox_relay", None)
+    if relay is not None:
+        try:
+            await relay.stop()
+        except Exception:
+            logger.warning("audit_outbox_relay_stop_failed", exc_info=True)
 
     # Cleanup Redis
     if app.state.redis:

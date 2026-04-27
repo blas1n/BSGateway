@@ -31,7 +31,10 @@ from typing import Any
 from uuid import UUID
 
 import structlog
+from bsvibe_audit.events.base import AuditActor
+from bsvibe_audit.events.gateway import ClassifierCacheHit
 
+from bsgateway.audit_publisher import emit_event, should_sample_cache_hit
 from bsgateway.core.cache import CacheManager
 from bsgateway.routing.classifiers.base import ClassificationResult, ClassifierProtocol
 
@@ -202,6 +205,13 @@ class CachingClassifier:
        ``CacheManager`` already swallows Redis errors and returns
        ``False`` from ``set`` / ``None`` from ``get``, so the wrapper is
        fail-soft by construction.
+
+    Phase Audit Batch 2 — when ``audit_app_state`` is set the wrapper
+    samples cache hits at ``CACHE_HIT_SAMPLE_RATE`` (env-tunable via
+    ``CLASSIFIER_AUDIT_SAMPLE_RATE``) and emits a
+    ``gateway.classifier.cache_hit`` event for the sampled subset. The
+    sampler is deterministic on the request fingerprint so a single hot
+    prompt either reliably surfaces or reliably stays silent.
     """
 
     def __init__(
@@ -210,12 +220,23 @@ class CachingClassifier:
         cache: CacheManager | None,
         *,
         ttl: timedelta,
+        audit_app_state: object | None = None,
     ) -> None:
         self._inner = inner
         self._cache = cache
         self._ttl = ttl
+        self._audit_app_state = audit_app_state
         self.hit_count = 0
         self.miss_count = 0
+
+    def attach_audit_state(self, app_state: object | None) -> None:
+        """Plumb the FastAPI ``app.state`` so cache hits can be (sampled) audited.
+
+        Called from the API lifespan once the audit emitter / session
+        factory have been constructed; idempotent so unit tests can wrap
+        a classifier first and attach later.
+        """
+        self._audit_app_state = app_state
 
     @property
     def hit_rate(self) -> float:
@@ -263,6 +284,24 @@ class CachingClassifier:
                     hits=self.hit_count,
                     misses=self.miss_count,
                 )
+                # Phase Audit Batch 2 — emit gateway.classifier.cache_hit
+                # for a deterministic 1% sample. Skip when audit not wired
+                # (default) so tests + module-level imports stay cheap.
+                if self._audit_app_state is not None and should_sample_cache_hit(fingerprint):
+                    actor_id = str(tenant_id) if tenant_id else "system"
+                    await emit_event(
+                        self._audit_app_state,
+                        ClassifierCacheHit(
+                            actor=AuditActor(type="system", id=actor_id),
+                            tenant_id=str(tenant_id) if tenant_id else None,
+                            data={
+                                "tier": cached.tier,
+                                "strategy": cached.strategy,
+                                "fingerprint": fingerprint,
+                                "hit_count": self.hit_count,
+                            },
+                        ),
+                    )
                 return cached
             # Corrupt payload — best-effort delete so it does not poison
             # subsequent reads, then fall through.

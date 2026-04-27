@@ -61,6 +61,15 @@ class Settings(FastApiSettings):
     # "closed" → block runs when BSupervisor is unreachable.
     bsupervisor_audit_fail_mode: str = "open"
 
+    # ----------------------------------------------------------------------
+    # Phase Audit Batch 2 — bsvibe-audit outbox emission.
+    # ----------------------------------------------------------------------
+    # Enables the SQLAlchemy-side ``audit_outbox`` writer + relay. Default
+    # off so Sprint 4 hot path stays bit-for-bit identical until the
+    # operator opts in (mirrors Phase 0 P0.7's posture for
+    # ``BSUPERVISOR_AUDIT_ENABLED``).
+    bsvibe_audit_outbox_enabled: bool = False
+
     # Frontend dist directory (for serving dashboard static files)
     frontend_dist_dir: str = ""
 

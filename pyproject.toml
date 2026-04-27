@@ -21,9 +21,19 @@ dependencies = [
     "bsvibe-fastapi @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-fastapi",
     "bsvibe-sqlalchemy @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-sqlalchemy",
     "bsvibe-authz @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-authz",
+    # Phase Audit Batch 2 — outbox-pattern audit emission for `gateway.*`
+    # domain events. Pin matches the other bsvibe-* packages on
+    # ``integration/phase-a`` so a single ref resolves the whole graph.
+    # The merge of ``feat/bsvibe-audit-impl`` (PR #7 on bsvibe-python)
+    # into ``integration/phase-a`` is a release-gate for this PR; uv.lock
+    # is regenerated post-merge. Local dev runs editable from
+    # ``~/Works/bsvibe-python/audit/packages/bsvibe-audit`` via
+    # ``uv pip install --no-deps -e <path>`` until then.
+    "bsvibe-audit @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-audit",
     "alembic>=1.13.0",
     "sqlalchemy>=2.0.0",
     "psycopg[binary]>=3.1.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.optional-dependencies]

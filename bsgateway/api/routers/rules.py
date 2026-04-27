@@ -4,6 +4,8 @@ from collections import defaultdict
 from uuid import UUID
 
 import asyncpg
+from bsvibe_audit.events.base import AuditActor
+from bsvibe_audit.events.gateway import RouteConfigChanged
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from bsgateway.api.deps import (
@@ -14,6 +16,7 @@ from bsgateway.api.deps import (
     require_permission,
     require_tenant_access,
 )
+from bsgateway.audit_publisher import emit_event
 from bsgateway.core.exceptions import DuplicateError
 from bsgateway.core.utils import parse_jsonb_value, safe_json_loads
 from bsgateway.embedding.provider import build_provider
@@ -166,6 +169,26 @@ async def create_rule(
         "rule",
         str(row["id"]),
         {"name": body.name, "target_model": body.target_model},
+    )
+
+    # Phase Audit Batch 2 — gateway.route.config_changed (action="created").
+    # ``audit.record`` writes to the legacy in-DB audit_logs table; this
+    # emit pushes the same event to the cross-product audit pipeline.
+    await emit_event(
+        request.app.state,
+        RouteConfigChanged(
+            actor=AuditActor(type="user", id=str(_auth.identity.id), email=_auth.identity.email),
+            tenant_id=str(tenant_id),
+            data={
+                "rule_id": str(row["id"]),
+                "action": "created",
+                "name": body.name,
+                "priority": body.priority,
+                "target_model": body.target_model,
+                "is_default": body.is_default,
+                "condition_count": len(body.conditions or []),
+            },
+        ),
     )
 
     return await _build_rule_response(repo, row, tenant_id)
@@ -393,6 +416,24 @@ async def update_rule(
             rule_id,
             [c.model_dump() for c in body.conditions],
         )
+
+    # Phase Audit Batch 2 — gateway.route.config_changed (action="updated").
+    await emit_event(
+        request.app.state,
+        RouteConfigChanged(
+            actor=AuditActor(type="user", id=str(_auth.identity.id), email=_auth.identity.email),
+            tenant_id=str(tenant_id),
+            data={
+                "rule_id": str(rule_id),
+                "action": "updated",
+                "name": row["name"],
+                "priority": row["priority"],
+                "target_model": row["target_model"],
+                "is_default": row["is_default"],
+                "condition_count": (len(body.conditions) if body.conditions is not None else None),
+            },
+        ),
+    )
 
     return await _build_rule_response(repo, row, tenant_id)
 
