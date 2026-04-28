@@ -15,21 +15,20 @@ dependencies = [
     "redis>=5.0.0",
     "httpx>=0.27.0",
     "bsvibe-auth[fastapi] @ git+https://github.com/BSVibe/BSVibe-Auth.git@v0.4.0#subdirectory=python",
-    # Phase A Batch 5 — pin all bsvibe-python packages to integration/phase-a
-    # (the unified ref containing core/fastapi/sqlalchemy/authz/alerts).
-    "bsvibe-core @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-core",
-    "bsvibe-fastapi @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-fastapi",
-    "bsvibe-sqlalchemy @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-sqlalchemy",
-    "bsvibe-authz @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-authz",
+    # Phase Audit Batch 2 — pin all bsvibe-python packages to
+    # ``integration/phase-audit-batch-2`` (supersedes ``integration/phase-a``
+    # by adding ``bsvibe-audit`` and ``bsvibe-llm`` on top of the four
+    # Phase A packages: core/fastapi/sqlalchemy/authz/alerts). Single ref
+    # so uv resolves the whole bsvibe-python graph from one commit.
+    "bsvibe-core @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-audit-batch-2#subdirectory=packages/bsvibe-core",
+    "bsvibe-fastapi @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-audit-batch-2#subdirectory=packages/bsvibe-fastapi",
+    "bsvibe-sqlalchemy @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-audit-batch-2#subdirectory=packages/bsvibe-sqlalchemy",
+    "bsvibe-authz @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-audit-batch-2#subdirectory=packages/bsvibe-authz",
     # Phase Audit Batch 2 — outbox-pattern audit emission for `gateway.*`
-    # domain events. Pin matches the other bsvibe-* packages on
-    # ``integration/phase-a`` so a single ref resolves the whole graph.
-    # The merge of ``feat/bsvibe-audit-impl`` (PR #7 on bsvibe-python)
-    # into ``integration/phase-a`` is a release-gate for this PR; uv.lock
-    # is regenerated post-merge. Local dev runs editable from
-    # ``~/Works/bsvibe-python/audit/packages/bsvibe-audit`` via
-    # ``uv pip install --no-deps -e <path>`` until then.
-    "bsvibe-audit @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-a#subdirectory=packages/bsvibe-audit",
+    # domain events. Lives only on ``integration/phase-audit-batch-2``
+    # (the merge of ``feat/bsvibe-audit-impl`` + ``feat/bsvibe-llm-impl``
+    # on top of ``integration/phase-a``).
+    "bsvibe-audit @ git+https://github.com/BSVibe/bsvibe-python.git@integration/phase-audit-batch-2#subdirectory=packages/bsvibe-audit",
     "alembic>=1.13.0",
     "sqlalchemy>=2.0.0",
     "psycopg[binary]>=3.1.0",

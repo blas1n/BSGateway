@@ -312,6 +312,44 @@ class TestAuditOutboxLifespanWiring:
         assert factory is not None
 
 
+class TestBsvibeAuditOutboxEnabledDefault:
+    """``BSVIBE_AUDIT_OUTBOX_ENABLED`` defaults to **on** as of Phase Audit
+    Batch 2 follow-up: the four ``gateway.*`` events surface in BSVibe-Auth
+    out of the box. Operators opt out with ``BSVIBE_AUDIT_OUTBOX_ENABLED=false``.
+
+    This locks the default — flipping it back would silently disable audit
+    emission across every BSGateway deployment that doesn't explicitly set
+    the env var.
+    """
+
+    def test_default_is_true(self, monkeypatch) -> None:
+        # Strip any developer-local override so the pydantic-settings default
+        # is what actually loads (otherwise a stray ``.env`` would mask a
+        # regression in the source default).
+        monkeypatch.delenv("BSVIBE_AUDIT_OUTBOX_ENABLED", raising=False)
+
+        from bsgateway.core.config import Settings
+
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert settings.bsvibe_audit_outbox_enabled is True
+
+    def test_env_false_disables(self, monkeypatch) -> None:
+        monkeypatch.setenv("BSVIBE_AUDIT_OUTBOX_ENABLED", "false")
+
+        from bsgateway.core.config import Settings
+
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert settings.bsvibe_audit_outbox_enabled is False
+
+    def test_env_true_keeps_enabled(self, monkeypatch) -> None:
+        monkeypatch.setenv("BSVIBE_AUDIT_OUTBOX_ENABLED", "true")
+
+        from bsgateway.core.config import Settings
+
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert settings.bsvibe_audit_outbox_enabled is True
+
+
 # ---------------------------------------------------------------------------
 # Emit-site smoke tests — wired routers call ``emit_event``.
 #

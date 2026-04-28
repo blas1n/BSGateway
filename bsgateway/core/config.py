@@ -65,10 +65,16 @@ class Settings(FastApiSettings):
     # Phase Audit Batch 2 — bsvibe-audit outbox emission.
     # ----------------------------------------------------------------------
     # Enables the SQLAlchemy-side ``audit_outbox`` writer + relay. Default
-    # off so Sprint 4 hot path stays bit-for-bit identical until the
-    # operator opts in (mirrors Phase 0 P0.7's posture for
-    # ``BSUPERVISOR_AUDIT_ENABLED``).
-    bsvibe_audit_outbox_enabled: bool = False
+    # **on** so the four ``gateway.*`` events surface in the BSVibe-Auth
+    # audit log out of the box. Set ``BSVIBE_AUDIT_OUTBOX_ENABLED=false``
+    # to opt out (the only failure path is a missing
+    # ``COLLECTOR_DATABASE_URL``, which keeps the relay disabled even
+    # when this flag is true — see ``audit_publisher.build_audit_outbox``).
+    #
+    # Operator action when upgrading: run ``alembic upgrade head`` (creates
+    # the ``audit_outbox`` table from rev ``0002_audit_outbox``) and set
+    # ``BSVIBE_AUTH_AUDIT_URL`` so the relay has somewhere to push events.
+    bsvibe_audit_outbox_enabled: bool = True
 
     # Frontend dist directory (for serving dashboard static files)
     frontend_dist_dir: str = ""
