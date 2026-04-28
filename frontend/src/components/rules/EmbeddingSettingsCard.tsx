@@ -49,7 +49,10 @@ export function EmbeddingSettingsCard({ tenantId }: Props) {
   }, [tenantId]);
 
   useEffect(() => {
-    refresh();
+    const id = window.setTimeout(() => {
+      refresh();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [refresh]);
 
   const handleSave = async () => {

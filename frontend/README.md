@@ -9,12 +9,12 @@ for the cross-asset baseline.
 ## Scripts
 
 ```bash
-npm install        # install deps (npm only — pnpm/yarn lockfiles removed)
-npm run dev        # Next dev server on :5173 (matches the old Vite port)
-npm run build      # Static export → frontend/dist/  (FastAPI serves it under /dashboard)
-npm run preview    # Serve the built dist/ over localhost:5173 via `npx serve`
-npm run lint       # ESLint flat config
-npm run test:e2e   # Playwright suite (boots `next dev`)
+pnpm install        # install deps
+pnpm run dev        # Next dev server on :5173 (matches the old Vite port)
+pnpm run build      # Static export -> frontend/dist/ (FastAPI serves it under /dashboard)
+pnpm run preview    # Serve the built dist/ over localhost:5173 via `npx serve`
+pnpm run lint       # ESLint flat config
+pnpm run test:e2e   # Playwright suite (boots `next dev`)
 ```
 
 ## Environment

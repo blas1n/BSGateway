@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { rulesApi } from '../api/rules';
 import { useAuth } from '../hooks/useAuth';
@@ -183,10 +183,8 @@ export function RulesPage() {
   const { t } = useTranslation();
   const { tenantId } = useAuth();
   const tid = tenantId || '';
-  const { data: rules, loading, error, refetch } = useApi(
-    () => rulesApi.list(tid),
-    [tid],
-  );
+  const loadRules = useCallback(() => rulesApi.list(tid), [tid]);
+  const { data: rules, loading, error, refetch } = useApi(loadRules);
 
   const [showModal, setShowModal] = useState(false);
   const { deleting, deleteError, handleDelete: onDelete, setDeleteError } = useDeleteConfirm();

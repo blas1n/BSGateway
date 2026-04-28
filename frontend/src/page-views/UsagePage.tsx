@@ -46,7 +46,10 @@ export function UsagePage() {
   }, [tid, period]);
 
   useEffect(() => {
-    loadUsage();
+    const id = window.setTimeout(() => {
+      loadUsage();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [loadUsage]);
 
   if (loading) return <LoadingSpinner />;

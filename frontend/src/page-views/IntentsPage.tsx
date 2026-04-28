@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../hooks/useApi';
 import { useForm } from '../hooks/useForm';
@@ -23,10 +24,8 @@ export function IntentsPage() {
   const { t } = useTranslation();
   const { tenantId } = useAuth();
   const tid = tenantId || '';
-  const { data: intents, loading, error, refetch } = useApi(
-    () => intentsApi.list(tid).catch(() => []),
-    [tid],
-  );
+  const loadIntents = useCallback(() => intentsApi.list(tid).catch(() => []), [tid]);
+  const { data: intents, loading, error, refetch } = useApi(loadIntents);
 
   const {
     formData, setFormData, showForm, setShowForm,

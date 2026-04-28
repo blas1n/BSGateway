@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiKeysApi } from '../api/apikeys';
 import { useAuth } from '../hooks/useAuth';
@@ -17,10 +17,8 @@ export function ApiKeysPage() {
   const { t } = useTranslation();
   const { tenantId } = useAuth();
   const tid = tenantId || '';
-  const { data: keys, loading, error, refetch } = useApi(
-    () => apiKeysApi.list(tid),
-    [tid],
-  );
+  const loadKeys = useCallback(() => apiKeysApi.list(tid), [tid]);
+  const { data: keys, loading, error, refetch } = useApi(loadKeys);
 
   const [newKey, setNewKey] = useState<string | null>(null);
 

@@ -42,18 +42,12 @@ export function ModelsPage() {
   const { t } = useTranslation();
   const { tenantId } = useAuth();
   const tid = tenantId || '';
-  const { data: models, loading, error, refetch } = useApi(
-    () => tenantsApi.listModels(tid),
-    [tid],
-  );
-  const { data: workers, refetch: refetchWorkers } = useApi(
-    () => executorsApi.listWorkers(),
-    [tid],
-  );
-  const { data: sparklines } = useApi(
-    () => tenantsApi.getSparklines(tid, 7),
-    [tid],
-  );
+  const loadModels = useCallback(() => tenantsApi.listModels(tid), [tid]);
+  const loadWorkers = useCallback(() => executorsApi.listWorkers(), []);
+  const loadSparklines = useCallback(() => tenantsApi.getSparklines(tid, 7), [tid]);
+  const { data: models, loading, error, refetch } = useApi(loadModels);
+  const { data: workers, refetch: refetchWorkers } = useApi(loadWorkers);
+  const { data: sparklines } = useApi(loadSparklines);
 
   const {
     formData, setFormData, showForm, setShowForm,
@@ -70,10 +64,8 @@ export function ModelsPage() {
   const [copied, setCopied] = useState(false);
 
   // Install token state
-  const { data: tokenStatus, refetch: refetchToken } = useApi(
-    () => executorsApi.getInstallToken(),
-    [tid],
-  );
+  const loadTokenStatus = useCallback(() => executorsApi.getInstallToken(), []);
+  const { data: tokenStatus, refetch: refetchToken } = useApi(loadTokenStatus);
   const [mintedToken, setMintedToken] = useState<string | null>(null);
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);

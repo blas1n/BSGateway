@@ -161,7 +161,10 @@ export function DashboardPage() {
   }, [tid]);
 
   useEffect(() => {
-    loadDashboard();
+    const id = window.setTimeout(() => {
+      loadDashboard();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [loadDashboard]);
 
   if (loading) return <LoadingSpinner />;

@@ -218,13 +218,15 @@ export function RoutesPage() {
   const { t } = useTranslation();
   const { tenantId } = useAuth();
   const tid = tenantId || '';
+  const loadRoutes = useCallback(() => routesApi.list(tid), [tid]);
+  const loadModels = useCallback(() => routesApi.listModels(tid), [tid]);
   const {
     data: cards,
     loading,
     error,
     refetch,
-  } = useApi(() => routesApi.list(tid), [tid]);
-  const { data: models } = useApi(() => routesApi.listModels(tid), [tid]);
+  } = useApi(loadRoutes);
+  const { data: models } = useApi(loadModels);
 
   const [showModal, setShowModal] = useState(false);
 

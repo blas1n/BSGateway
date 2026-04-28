@@ -43,7 +43,10 @@ export function AuditPage() {
   }, [tid, offset]);
 
   useEffect(() => {
-    loadAuditLogs();
+    const id = window.setTimeout(() => {
+      loadAuditLogs();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [loadAuditLogs]);
 
   if (loading) return <LoadingSpinner />;

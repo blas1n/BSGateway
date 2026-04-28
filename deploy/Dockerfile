@@ -19,7 +19,8 @@ RUN uv pip install --system --compile-bytecode --no-cache .
 
 # Build frontend (Next.js 15 static export → frontend/dist)
 COPY frontend/ ./frontend/
-RUN cd frontend && CI=true npm ci && npm run build
+RUN cd frontend && corepack enable && corepack prepare pnpm@10.33.0 --activate \
+    && CI=true pnpm install --frozen-lockfile && pnpm run build
 
 # Runtime stage
 FROM python:3.11-slim
