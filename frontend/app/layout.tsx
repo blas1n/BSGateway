@@ -5,7 +5,7 @@ import { AppShell } from '@/src/components/layout/AppShell';
 export const metadata: Metadata = {
   title: 'BSGateway Dashboard',
   icons: {
-    icon: '/dashboard/favicon.svg',
+    icon: '/favicon.svg',
   },
 };
 
