@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const frontendPort = Number(process.env.BSGATEWAY_TEST_FRONTEND_PORT || 5173);
+const frontendUrl = `http://localhost:${frontendPort}`;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['html'], ['list']],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: frontendUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -37,8 +40,8 @@ export default defineConfig({
   ],
   webServer: {
     // Was `vite --port 5173`; now `next dev -p 5173`. Test surface is unchanged.
-    command: 'pnpm run dev',
-    url: 'http://localhost:5173',
+    command: `pnpm exec next dev -p ${frontendPort}`,
+    url: frontendUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

@@ -40,6 +40,8 @@ if TYPE_CHECKING:
     import asyncpg
     from redis.asyncio import Redis
 
+    from bsgateway.supervisor.client import BSupervisorClient, RunMetadata
+
 logger = structlog.get_logger(__name__)
 
 _sql = SqlLoader()
@@ -64,6 +66,7 @@ class ChatService:
         encryption_key: bytes,
         redis: Redis | None = None,
         background_tasks: set[asyncio.Task] | None = None,
+        supervisor: BSupervisorClient | None = None,
     ) -> None:
         self._pool = pool
         self._encryption_key = encryption_key
@@ -72,6 +75,7 @@ class ChatService:
         self._background_tasks: set[asyncio.Task] = (
             background_tasks if background_tasks is not None else set()
         )
+        self._supervisor = supervisor
 
     async def load_tenant_config(self, tenant_id: UUID) -> TenantConfig:
         """Batch-load rules + conditions + models + intent examples for a tenant."""
@@ -312,7 +316,34 @@ class ChatService:
         stream = request_data.get("stream", False)
         litellm_kwargs["stream"] = stream
 
-        response = await litellm.acompletion(**litellm_kwargs)
+        run_meta = self._run_metadata(request_metadata, resolved_model=model.litellm_model)
+        if self._supervisor is not None and run_meta is not None:
+            pre = await self._supervisor.run_pre(run_meta)
+            if pre.blocked:
+                raise ChatError(
+                    pre.reason or "blocked by BSupervisor policy",
+                    code="bsupervisor_blocked",
+                    status_code=403,
+                )
+
+        try:
+            response = await litellm.acompletion(**litellm_kwargs)
+        except Exception:
+            if self._supervisor is not None and run_meta is not None:
+                await self._supervisor.run_post(
+                    run_meta,
+                    status="error",
+                )
+            raise
+
+        if self._supervisor is not None and run_meta is not None:
+            usage = getattr(response, "usage", None)
+            await self._supervisor.run_post(
+                run_meta,
+                status="success",
+                tokens_in=getattr(usage, "prompt_tokens", None) if usage is not None else None,
+                tokens_out=getattr(usage, "completion_tokens", None) if usage is not None else None,
+            )
 
         # Fire-and-forget: log routing decision + budget tracking
         task = asyncio.create_task(
@@ -325,6 +356,12 @@ class ChatService:
         task.add_done_callback(self._on_background_done)
 
         return response
+
+    @staticmethod
+    def _run_metadata(metadata: dict[str, Any], *, resolved_model: str) -> RunMetadata | None:
+        from bsgateway.supervisor.client import RunMetadata
+
+        return RunMetadata.from_request_metadata(metadata, resolved_model=resolved_model)
 
     async def _execute_via_worker(
         self,
