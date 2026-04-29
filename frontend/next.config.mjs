@@ -9,6 +9,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['bsserver'],
   // Pin tracing root to the frontend directory so the parent repo is not
   // inferred as the workspace root during static export builds.
   outputFileTracingRoot: __dirname,
@@ -38,8 +39,8 @@ const nextConfig = {
     ? {
         async rewrites() {
           const backend =
-            process.env.NEXT_PUBLIC_API_URL ||
             process.env.VITE_PROXY_TARGET ||
+            process.env.NEXT_PUBLIC_API_URL ||
             'http://localhost:8000';
           const target = backend.endsWith('/') ? backend.slice(0, -1) : backend;
           return [
