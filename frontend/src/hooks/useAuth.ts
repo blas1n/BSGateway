@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, setOnUnauthorized, resetLogoutFlag } from '../api/client';
 
-const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'https://auth.bsvibe.dev';
+const AUTH_URL =
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_AUTH_URL) ||
+  'https://auth.bsvibe.dev';
 const TENANT_NAME_KEY = 'bsvibe_tenant_name';
 const STORED_TOKEN_KEY = 'bsgateway_access_token';
 const STORED_REFRESH_KEY = 'bsgateway_refresh_token';
@@ -13,6 +15,10 @@ interface SessionResponse {
 }
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
+
+interface AccessTokenOptions {
+  probeRemoteSession?: boolean;
+}
 
 function decodeJwt(token: string): Record<string, unknown> {
   const parts = token.split('.');
@@ -52,7 +58,9 @@ function consumeHashTokens(): string | null {
   return access;
 }
 
-export async function getAccessToken(): Promise<string | null> {
+export async function getAccessToken({
+  probeRemoteSession = true,
+}: AccessTokenOptions = {}): Promise<string | null> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 30_000) {
     return cachedToken.value;
   }
@@ -67,6 +75,10 @@ export async function getAccessToken(): Promise<string | null> {
   const stored = typeof window !== 'undefined' ? localStorage.getItem(STORED_TOKEN_KEY) : null;
   if (stored && !isExpired(stored)) {
     return stored;
+  }
+
+  if (!probeRemoteSession) {
+    return null;
   }
 
   // 3. Cookie-based session (works only on *.bsvibe.dev origins)
@@ -136,13 +148,15 @@ function readInitialState(): AuthState {
   };
 }
 
-export function useAuth() {
+export function useAuth({
+  probeRemoteSession = true,
+}: AccessTokenOptions = {}) {
   const [state, setState] = useState<AuthState>(readInitialState);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const token = await getAccessToken();
+      const token = await getAccessToken({ probeRemoteSession });
       if (cancelled) return;
       if (!token) {
         setState((prev) => ({ ...prev, isLoading: false }));
@@ -160,7 +174,7 @@ export function useAuth() {
       });
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [probeRemoteSession]);
 
   // Fetch tenant name on first auth
   useEffect(() => {

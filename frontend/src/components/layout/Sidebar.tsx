@@ -1,13 +1,24 @@
-import { Link, useLocation } from 'react-router-dom';
+'use client';
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: 'dashboard' },
-  { path: '/rules', label: 'Routing', icon: 'alt_route' },
-  { path: '/models', label: 'Models', icon: 'model_training' },
-  { path: '/test', label: 'Routing Test', icon: 'route' },
-  { path: '/usage', label: 'Analytics', icon: 'bar_chart' },
-  { path: '/api-keys', label: 'API Keys', icon: 'vpn_key' },
-  { path: '/audit', label: 'Audit Log', icon: 'receipt_long' },
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
+
+interface NavItem {
+  path: string;
+  labelKey: string;
+  icon: string;
+}
+
+const navItems: readonly NavItem[] = [
+  { path: '/', labelKey: 'nav.dashboard', icon: 'dashboard' },
+  { path: '/rules', labelKey: 'nav.rules', icon: 'alt_route' },
+  { path: '/models', labelKey: 'nav.models', icon: 'model_training' },
+  { path: '/test', labelKey: 'nav.routingTest', icon: 'route' },
+  { path: '/usage', labelKey: 'nav.usage', icon: 'bar_chart' },
+  { path: '/api-keys', labelKey: 'nav.apiKeys', icon: 'vpn_key' },
+  { path: '/audit', labelKey: 'nav.audit', icon: 'receipt_long' },
 ];
 
 interface SidebarProps {
@@ -19,15 +30,18 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onLogout, tenantSlug, tenantName, isOpen, onClose }: SidebarProps) {
-  const location = useLocation();
+  const pathname = usePathname() ?? '/';
+  const { t } = useTranslation();
 
   return (
     <>
       {/* Backdrop - mobile only */}
       {isOpen && (
         <div
+          data-testid="bsgateway-sidebar-backdrop"
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
+          role="presentation"
         />
       )}
     <aside className={`fixed left-0 top-0 h-screen w-64 bg-[#121317] flex flex-col z-50 transform transition-transform duration-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
@@ -45,7 +59,7 @@ export function Sidebar({ onLogout, tenantSlug, tenantName, isOpen, onClose }: S
               {tenantName}
             </p>
           ) : (
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">LLM Routing</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">{t('nav.tagline')}</p>
           )}
         </div>
       </div>
@@ -55,38 +69,39 @@ export function Sidebar({ onLogout, tenantSlug, tenantName, isOpen, onClose }: S
         {navItems.map((item) => {
           const isActive =
             item.path === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.path);
+              ? pathname === '/'
+              : pathname.startsWith(item.path);
           return (
             <Link
               key={item.path}
-              to={item.path}
+              href={item.path}
               onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3 rounded text-sm transition-all duration-200 ${
+              className={`flex min-h-11 items-center gap-3 px-4 py-3 rounded text-sm transition-all duration-200 ${
                 isActive
                   ? 'text-amber-500 bg-amber-500/10 border-r-2 border-amber-500 font-semibold'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-[#1f1f24] active:scale-95'
               }`}
             >
               <span className="material-symbols-outlined">{item.icon}</span>
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* Footer */}
-      {onLogout && (
-        <div className="p-4 border-t border-amber-900/10">
+      <div className="p-4 border-t border-amber-900/10 space-y-3">
+        <LanguageSwitcher />
+        {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded text-sm text-slate-400 hover:text-slate-200 hover:bg-[#1f1f24] transition-colors"
+            className="w-full flex min-h-11 items-center gap-3 px-4 py-3 rounded text-sm text-slate-400 hover:text-slate-200 hover:bg-[#1f1f24] transition-colors"
           >
             <span className="material-symbols-outlined">logout</span>
-            <span>Logout</span>
+            <span>{t('nav.logout')}</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
     </>
   );
