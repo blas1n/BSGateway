@@ -25,6 +25,12 @@
  */
 @import "tailwindcss";
 
+/* Tailwind 4 source scan — pull in @bsvibe/layout's compiled JS so that
+ * inline utility classes from the shared sidebar (border-l-4, min-h-[44px],
+ * bg-gray-950, etc.) are present in the generated CSS. Without this the
+ * library renders unstyled. */
+@source "../node_modules/@bsvibe/layout/dist/**/*.js";
+
 @theme {
   /* Material 3 dark theme tokens — ports of tailwind.config.js */
   --color-primary: #ffc174;
