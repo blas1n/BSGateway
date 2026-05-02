@@ -12,8 +12,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(tailwindcss@4.2.4)
       '@bsvibe/layout':
-        specifier: ^0.4.0
-        version: 0.4.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^0.5.0
+        version: 0.5.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       i18next:
         specifier: ^26.0.3
         version: 26.0.8(typescript@5.9.3)
@@ -170,8 +170,8 @@ packages:
       tailwindcss:
         optional: true
 
-  '@bsvibe/layout@0.4.0':
-    resolution: {integrity: sha512-HBiGRcjdhzGrxC4ihp1P7Wk/MSMRTJ2V77j14qEvNs9bLN3PRnVvDSwzmj/hv6fzNGobKinT5AsE8KPZFX+exQ==, tarball: https://npm.pkg.github.com/download/@bsvibe/layout/0.4.0/d8075bd793f252b2fec55a6d61c2cad52500e0c8}
+  '@bsvibe/layout@0.5.0':
+    resolution: {integrity: sha512-H0QVBKvmHLCIlt1WoHgpZoyeGQlVR7oGIIM53pcLKriWZ/UtWLhKKoYMX7JYhVoa9exWSj6nZKNQe8GyF07viA==, tarball: https://npm.pkg.github.com/download/@bsvibe/layout/0.5.0/777cfc2cf7a67ecaba5b2f57ac7e4e6a24ad5379}
     peerDependencies:
       next: '>=15.0.0'
       react: '>=19.0.0'
@@ -2353,7 +2353,7 @@ snapshots:
     optionalDependencies:
       tailwindcss: 4.2.4
 
-  '@bsvibe/layout@0.4.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@bsvibe/layout@0.5.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@bsvibe/auth': 1.0.0-alpha.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@bsvibe/types': 0.1.0
