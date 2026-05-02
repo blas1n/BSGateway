@@ -197,11 +197,11 @@ export function useAuth({
 
   // Fetch tenants list (auth-app /api/session) so the workspace switcher
   // has all options for the current user. Cookie or bearer accepted.
+  // The tenants state defaults to []; when auth is gone, we just skip
+  // the fetch (logout() also resets) — avoids a React 19 compiler-lint
+  // synchronous-setState-in-effect warning.
   useEffect(() => {
-    if (!state.isAuthenticated) {
-      setTenants([]);
-      return;
-    }
+    if (!state.isAuthenticated) return;
     let cancelled = false;
     (async () => {
       const token = await getAccessToken({ probeRemoteSession });
@@ -226,6 +226,7 @@ export function useAuth({
     resetLogoutFlag();
     sessionStorage.removeItem(TENANT_NAME_KEY);
     await fetch(`${AUTH_URL}/api/session`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+    setTenants([]);
     setState({
       isAuthenticated: false,
       isLoading: false,
