@@ -2,8 +2,8 @@
 
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ResponsiveSidebar, SidebarBrand, SidebarUserCard } from '@bsvibe/layout';
-import { LanguageSwitcher } from '../common/LanguageSwitcher';
+import { LanguageToggle, ResponsiveSidebar, SidebarBrand, SidebarUserCard } from '@bsvibe/layout';
+import { SUPPORTED_LOCALES, setLocale, type Locale } from '../../i18n';
 import { HelpButton } from '../help/HelpButton';
 
 interface LayoutProps {
@@ -40,7 +40,7 @@ function GatewayLogo() {
 }
 
 export function Layout({ onLogout, tenantSlug, tenantName, email, role, children }: LayoutProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const items = navItems.map((item) => ({
     href: item.path,
@@ -65,7 +65,13 @@ export function Layout({ onLogout, tenantSlug, tenantName, email, role, children
         }
         footer={
           <div className="flex flex-col gap-3" title={tenantSlug || ''}>
-            <LanguageSwitcher />
+            <LanguageToggle
+              value={(i18n.language as Locale) ?? 'en'}
+              options={SUPPORTED_LOCALES.map((l) => ({ value: l, label: l.toUpperCase() }))}
+              onChange={(next) => setLocale(next as Locale)}
+              ariaLabel={t('language.label')}
+              dataTestId="lang-switcher"
+            />
             {onLogout && email ? (
               <SidebarUserCard
                 email={email}
