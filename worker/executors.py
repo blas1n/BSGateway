@@ -442,6 +442,7 @@ class OpenCodeExecutor:
             return
 
         system = context.get("system") or ""
+        mcp_servers = context.get("mcp_servers") or {}
         try:
             async with httpx.AsyncClient(
                 base_url=base_url, timeout=self._request_timeout
@@ -449,6 +450,12 @@ class OpenCodeExecutor:
                 session_body: dict[str, Any] = {}
                 if system:
                     session_body["system"] = system
+                # TODO E5b — opencode session-level MCP injection. The
+                # ``mcpServers`` field on session create matches claude
+                # CLI's ``--mcp-config`` shape (``{name: {url, headers}}``).
+                # Empty / missing ⇒ field omitted (back-compat).
+                if mcp_servers:
+                    session_body["mcpServers"] = mcp_servers
                 res = await client.post("/session", json=session_body)
                 res.raise_for_status()
                 session_id = res.json().get("id") or res.json().get("sessionID")

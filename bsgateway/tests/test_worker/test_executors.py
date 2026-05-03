@@ -399,6 +399,122 @@ async def test_opencode_executor_streams_sse_events() -> None:
     assert result.stdout == "Hello"
 
 
+@pytest.mark.asyncio
+async def test_opencode_executor_passes_mcp_servers_to_session_create() -> None:
+    """TODO E5b — opencode session-level MCP injection. mcp_servers from
+    context lands in the ``mcpServers`` field of the session POST body."""
+    executor = OpenCodeExecutor()
+    executor._cmd = "/bin/true"
+    executor._base_url = "http://127.0.0.1:1234"
+    executor._proc = MagicMock()
+    executor._proc.returncode = None
+
+    captured: list[dict[str, Any]] = []
+
+    class _FakeStreamResp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            pass
+
+        async def aiter_lines(self):
+            yield "data: " + json.dumps(
+                {"type": "session.idle", "properties": {"sessionID": "sess-1"}}
+            )
+            yield ""
+
+    class _FakeStreamCtx:
+        async def __aenter__(self):
+            return _FakeStreamResp()
+
+        async def __aexit__(self, *a, **kw):
+            return None
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a, **kw):
+            return None
+
+        async def post(self, path: str, json: dict[str, Any] | None = None):
+            captured.append({"path": path, "body": json})
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+            resp.json = MagicMock(return_value={"id": "sess-1"})
+            return resp
+
+        def stream(self, method: str, path: str):
+            return _FakeStreamCtx()
+
+    mcp = {"bsnexus": {"url": "http://localhost:8100/mcp/sse?token=t", "headers": {}}}
+    with patch("worker.executors.httpx.AsyncClient", _FakeClient):
+        await collect(executor.execute("p", {"task_id": "t", "mcp_servers": mcp}))
+
+    session_create = next(c for c in captured if c["path"] == "/session")
+    assert session_create["body"].get("mcpServers") == mcp
+
+
+@pytest.mark.asyncio
+async def test_opencode_executor_omits_mcp_servers_when_empty() -> None:
+    """Back-compat: empty ``mcp_servers`` ⇒ ``mcpServers`` field absent."""
+    executor = OpenCodeExecutor()
+    executor._cmd = "/bin/true"
+    executor._base_url = "http://127.0.0.1:1234"
+    executor._proc = MagicMock()
+    executor._proc.returncode = None
+
+    captured: list[dict[str, Any]] = []
+
+    class _FakeStreamResp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            pass
+
+        async def aiter_lines(self):
+            yield "data: " + json.dumps(
+                {"type": "session.idle", "properties": {"sessionID": "sess-1"}}
+            )
+            yield ""
+
+    class _FakeStreamCtx:
+        async def __aenter__(self):
+            return _FakeStreamResp()
+
+        async def __aexit__(self, *a, **kw):
+            return None
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a, **kw):
+            return None
+
+        async def post(self, path: str, json: dict[str, Any] | None = None):
+            captured.append({"path": path, "body": json})
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+            resp.json = MagicMock(return_value={"id": "sess-1"})
+            return resp
+
+        def stream(self, method: str, path: str):
+            return _FakeStreamCtx()
+
+    with patch("worker.executors.httpx.AsyncClient", _FakeClient):
+        await collect(executor.execute("p", {"task_id": "t"}))
+
+    session_create = next(c for c in captured if c["path"] == "/session")
+    assert "mcpServers" not in session_create["body"]
+
+
 # ─── factory ─────────────────────────────────────────────────────────
 
 
