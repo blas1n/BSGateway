@@ -74,11 +74,10 @@ jobs:
 
       - name: Start frontend in background
         working-directory: frontend
-        env:
-          NEXT_PUBLIC_BSVIBE_DEMO: '1'
-          NEXT_PUBLIC_API_URL: http://localhost:4500
         run: |
-          nohup pnpm exec next start -p "$FRONTEND_PORT" > /tmp/frontend.log 2>&1 &
+          # next.config has `output: 'export'` → static files in dist/
+          # Use serve to host the static build.
+          nohup pnpm dlx serve dist -l "$FRONTEND_PORT" -s > /tmp/frontend.log 2>&1 &
           for _ in $(seq 1 30); do
             if curl -fsS -o /dev/null --max-time 2 "http://localhost:${FRONTEND_PORT}/"; then
               echo "frontend ready"
