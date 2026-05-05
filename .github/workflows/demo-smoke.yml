@@ -83,13 +83,38 @@ jobs:
       - name: Start frontend in background
         working-directory: frontend
         run: |
-          # next.config has `output: 'export'` → static files in dist/.
-          # Use `pnpm exec serve` (installed as devDep). `pnpm dlx serve`
-          # has a cwd quirk that resolved `dist` against pnpm's tmp dir
-          # instead of the package, leaving serve to fall back to the
-          # frontend root and emit a directory listing.
-          test -f dist/index.html || { echo "::error::dist/index.html missing — build did not produce static export"; ls -la dist | head -20; exit 1; }
-          nohup pnpm exec serve dist -l "$FRONTEND_PORT" -s > /tmp/frontend.log 2>&1 &
+          # Static export is in dist/. Avoid `serve` — both `pnpm dlx`
+          # and `pnpm exec` variants emitted `.next/` build-cache content
+          # on the GitHub Actions Linux runner instead of dist/index.html.
+          # Use a tiny inline node http server with an absolute path so
+          # there is no resolver ambiguity.
+          test -f dist/index.html || { echo "::error::dist/index.html missing"; ls -la dist | head -20; exit 1; }
+          cat > /tmp/serve-static.js <<'JS'
+          const http = require('http');
+          const fs = require('fs');
+          const path = require('path');
+          const ROOT = process.argv[2];
+          const PORT = parseInt(process.argv[3], 10);
+          const MIME = { '.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.txt':'text/plain','.woff':'font/woff','.woff2':'font/woff2' };
+          http.createServer((req, res) => {
+            const u = req.url.split('?')[0];
+            let p = path.join(ROOT, u);
+            try { if (fs.statSync(p).isDirectory()) p = path.join(p, 'index.html'); } catch {}
+            fs.readFile(p, (err, data) => {
+              if (err) {
+                fs.readFile(path.join(ROOT, 'index.html'), (e2, d2) => {
+                  if (e2) { res.statusCode = 404; res.end('Not found'); return; }
+                  res.setHeader('Content-Type', 'text/html'); res.end(d2);
+                });
+                return;
+              }
+              res.setHeader('Content-Type', MIME[path.extname(p)] || 'application/octet-stream');
+              res.end(data);
+            });
+          }).listen(PORT, () => console.log('serving', ROOT, 'on', PORT));
+          JS
+          DIST_ABS="$(pwd)/dist"
+          nohup node /tmp/serve-static.js "$DIST_ABS" "$FRONTEND_PORT" > /tmp/frontend.log 2>&1 &
           for _ in $(seq 1 30); do
             if curl -fsS -o /dev/null --max-time 2 "http://localhost:${FRONTEND_PORT}/"; then
               echo "frontend ready"
