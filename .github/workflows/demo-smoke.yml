@@ -1,0 +1,86 @@
+name: Demo smoke
+
+# Boots the demo stack (frontend bundled inside backend container) and runs
+# the @bsvibe/demo Playwright suite against it. Catches integration bugs
+# that build-only CI misses — see PR description for the four bug classes
+# this gate is designed to fail.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  demo-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10
+
+      - name: Generate ephemeral demo secrets
+        id: secrets
+        run: |
+          {
+            echo "DEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "REDIS_PASSWORD=$(openssl rand -hex 16)"
+            echo "ENCRYPTION_KEY=$(openssl rand -hex 32)"
+            echo "LITELLM_MASTER_KEY=$(openssl rand -hex 32)"
+            echo "LOG_LEVEL=INFO"
+          } > deploy/.env.demo
+
+      - name: Boot demo stack
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          docker compose -p bsgateway-demo-ci \
+            -f deploy/docker-compose.demo.yml \
+            --env-file deploy/.env.demo \
+            up -d --build --wait
+          # Brief grace for app health endpoint after compose --wait
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null --max-time 2 http://localhost:4500/health; then
+              echo "backend healthy"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Frontend deps
+        working-directory: frontend
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run demo smoke suite
+        working-directory: frontend
+        env:
+          DEMO_E2E_BASE_URL: http://localhost:4500
+          DEMO_E2E_API_URL: http://localhost:4500
+        run: pnpm exec playwright test --grep @demo --project=chromium
+
+      - name: Demo backend logs (on failure)
+        if: failure()
+        run: |
+          docker compose -p bsgateway-demo-ci -f deploy/docker-compose.demo.yml logs --tail=200 app
+          docker compose -p bsgateway-demo-ci -f deploy/docker-compose.demo.yml logs --tail=50 postgres redis
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -p bsgateway-demo-ci -f deploy/docker-compose.demo.yml down -v
