@@ -83,20 +83,20 @@ jobs:
       - name: Start frontend in background
         working-directory: frontend
         run: |
-          # Static export lives in dist/. Both `serve` and `http-server`
-          # via `pnpm exec` ended up serving the .next/ build-cache
-          # directory in this Linux runner — page snapshots showed
-          # cache/, server/, static/ instead of dist/'s 404, _next,
-          # api-keys… Pass an absolute path AND cd into dist/ before
-          # exec to remove every layer of resolution ambiguity.
+          # Static export lives in dist/. node http-server kept showing the
+          # .next build-cache dir even when launched from dist/ — switch to
+          # python http.server which has zero indirection and rock-solid
+          # behavior on the runner.
           test -f dist/index.html || { echo "::error::dist/index.html missing"; ls -la dist | head -20; exit 1; }
-          DIST_ABS="$(pwd)/dist"
-          echo "DIST_ABS=$DIST_ABS"
-          ls -la "$DIST_ABS" | head -5
-          realpath "$DIST_ABS"
-          # Also list what dist content the node binary actually sees
-          node -e "console.log(require('fs').readdirSync(process.argv[1]).slice(0, 8))" "$DIST_ABS"
-          (cd "$DIST_ABS" && nohup node ../node_modules/http-server/bin/http-server . -p "$FRONTEND_PORT" -s --silent > /tmp/frontend.log 2>&1 &)
+          # Belt and suspenders: ensure no other process is on the port already
+          if ss -ltn | grep -q ":${FRONTEND_PORT} "; then
+            echo "::error::port ${FRONTEND_PORT} already in use"
+            ss -ltnp | head -10
+            exit 1
+          fi
+          cd dist
+          nohup python3 -m http.server "$FRONTEND_PORT" --bind 127.0.0.1 > /tmp/frontend.log 2>&1 &
+          cd ..
           for _ in $(seq 1 30); do
             if curl -fsS -o /dev/null --max-time 2 "http://localhost:${FRONTEND_PORT}/"; then
               echo "frontend ready"
@@ -104,6 +104,11 @@ jobs:
             fi
             sleep 2
           done
+          # Verify what's actually being served
+          echo "::group::GET / preview"
+          curl -sS http://localhost:"$FRONTEND_PORT"/ | head -c 400
+          echo
+          echo "::endgroup::"
 
       - name: Install Playwright browsers
         working-directory: frontend
