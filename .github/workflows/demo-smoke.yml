@@ -102,6 +102,16 @@ jobs:
         if: failure()
         run: tail -200 /tmp/frontend.log || true
 
+      - name: Upload Playwright trace + screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7
+
       - name: Demo backend logs (on failure)
         if: failure()
         run: |
