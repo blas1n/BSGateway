@@ -66,6 +66,14 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile
 
+      - name: Force playwright reuseExistingServer
+        working-directory: frontend
+        run: |
+          # Default reuseExistingServer: !process.env.CI is false in CI,
+          # so Playwright tries to launch its own `next dev` even when
+          # our prod server is already on port 3000. Force-reuse it.
+          sed -i 's/reuseExistingServer: !process.env.CI/reuseExistingServer: true/' playwright.config.ts
+
       - name: Build frontend in demo mode
         working-directory: frontend
         env:
@@ -119,6 +127,12 @@ jobs:
         env:
           DEMO_E2E_BASE_URL: http://localhost:3000
           DEMO_E2E_API_URL: http://localhost:4500
+          # Pin Playwright's webServer/baseURL port to our prod port. The
+          # default 5173 means Playwright spawns `next dev -p 5173` in
+          # parallel — which, because next.config has distDir: 'dist',
+          # clobbers our static export with dev-mode build cache halfway
+          # through the test run.
+          BSGATEWAY_TEST_FRONTEND_PORT: '3000'
         run: pnpm exec playwright test --grep @demo --project=chromium
 
       - name: Frontend log (on failure)
