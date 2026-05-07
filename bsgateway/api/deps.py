@@ -40,6 +40,9 @@ from bsvibe_authz import (
     require_permission as _authz_require_permission,
 )
 from bsvibe_authz import (
+    require_scope as _authz_require_scope,
+)
+from bsvibe_authz import (
     verify_bootstrap_token as _verify_bootstrap_token,
 )
 from bsvibe_authz import (
@@ -81,6 +84,22 @@ def require_permission(
         resource_id_param=resource_id_param,
     )
     dep._bsvibe_permission = permission  # type: ignore[attr-defined]
+    return dep
+
+
+def require_scope(scope: str) -> Callable[..., Awaitable[None]]:
+    """Wrap ``bsvibe_authz.require_scope`` and tag the closure.
+
+    Phase 1 token cutover gates admin routes on scope strings carried by
+    bootstrap / opaque service-key tokens (``"*"`` for bootstrap, narrow
+    ``gateway:<resource>:<action>`` for service keys). The tag
+    (``_bsvibe_scope``) lets ``test_authz_scope_matrix.py`` pin the
+    catalog so future refactors cannot silently downgrade a gate.
+
+    See ``docs/scopes.md`` for the active catalog.
+    """
+    dep = _authz_require_scope(scope)
+    dep._bsvibe_scope = scope  # type: ignore[attr-defined]
     return dep
 
 
