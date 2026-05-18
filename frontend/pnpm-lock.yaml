@@ -22,8 +22,8 @@ importers:
         specifier: 0.3.0
         version: 0.3.0(next-intl@4.11.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
       '@bsvibe/layout':
-        specifier: ^0.7.0
-        version: 0.7.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^0.7.1
+        version: 0.7.1(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@bsvibe/ui':
         specifier: 0.2.0
         version: 0.2.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(tailwindcss@4.2.4)
@@ -203,9 +203,12 @@ packages:
       next: '>=15.0.0'
       next-intl: 4.11.0
       react: '>=19.0.0'
+    peerDependenciesMeta:
+      next:
+        optional: true
 
-  '@bsvibe/layout@0.7.0':
-    resolution: {integrity: sha512-6j8y8Juk71yzXajE46aTxhInyvEI0cFNKnmuAAy7XOa3/saRCdw4Wr7xsM7W1IbMhZbJ7krcbh6gu6kQ76l0Tw==, tarball: https://npm.pkg.github.com/download/@bsvibe/layout/0.7.0/da8b14e9b115349feb7f1bb6a70b8bab0ef24257}
+  '@bsvibe/layout@0.7.1':
+    resolution: {integrity: sha512-jUfGZQOI2NXNd4VcQ6a8kc7YHXGRaF726akPesMQjf2c+n/qP+YKaprSaMUV7whgBE/OdPkEK6cNHt1j+n9X7A==, tarball: https://npm.pkg.github.com/download/@bsvibe/layout/0.7.1/cb33822290861bed5b90148edaecc76f4d3d981a}
     peerDependencies:
       next: '>=15.0.0'
       react: '>=19.0.0'
@@ -2688,11 +2691,12 @@ snapshots:
 
   '@bsvibe/i18n@0.3.0(next-intl@4.11.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)':
     dependencies:
-      next: 15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       next-intl: 4.11.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)
       react: 19.2.5
+    optionalDependencies:
+      next: 15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
 
-  '@bsvibe/layout@0.7.0(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@bsvibe/layout@0.7.1(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@bsvibe/auth': 1.0.0-alpha.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@bsvibe/types': 0.1.0
