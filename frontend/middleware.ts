@@ -23,6 +23,11 @@ export default createI18nMiddleware({
   locales: ['ko', 'en'],
   defaultLocale: 'en',
   localePrefix: 'as-needed',
+  // Bare paths always mean the default locale (`en`). Without this,
+  // next-intl's locale detection redirects `/` → `/ko` whenever a stale
+  // `NEXT_LOCALE=ko` cookie is present — which a user picks up the moment
+  // they view `/ko` once, permanently breaking the `ko → en` toggle.
+  localeDetection: false,
 });
 
 // NOTE: Next.js parses `config.matcher` statically — spread operators or
