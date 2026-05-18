@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isDemoMode } from '@bsvibe/demo';
 import { api, setOnUnauthorized, resetLogoutFlag } from '../api/client';
 
@@ -236,6 +236,10 @@ export function useAuth({
 }: AccessTokenOptions = {}) {
   const [state, setState] = useState<AuthState>(readInitialState);
   const [tenants, setTenants] = useState<SessionTenant[]>([]);
+  // Best-effort name from the Gateway's own `/tenants/{id}` endpoint, used
+  // only as a fallback before the authoritative `/api/session` tenants list
+  // (which carries the real workspace name) has loaded.
+  const [gatewayTenantName, setGatewayTenantName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,17 +277,40 @@ export function useAuth({
     return () => { cancelled = true; };
   }, [probeRemoteSession]);
 
-  // Fetch tenant name on first auth (Gateway backend)
+  // Best-effort fallback: fetch the Gateway's own `/tenants/{id}` name in
+  // case the authoritative `/api/session` tenants list never loads. This
+  // name is a placeholder (the tenant-id prefix) and is only surfaced when
+  // nothing better is available — see `tenantName` derivation below.
   useEffect(() => {
-    if (!state.isAuthenticated || !state.tenantId || state.tenantName) return;
-
+    if (!state.isAuthenticated || !state.tenantId) return;
+    let cancelled = false;
     api.get<{ name: string }>(`/tenants/${state.tenantId}`)
       .then((tenant) => {
-        sessionStorage.setItem(TENANT_NAME_KEY, tenant.name);
-        setState((prev) => ({ ...prev, tenantName: tenant.name }));
+        if (!cancelled) setGatewayTenantName(tenant.name);
       })
       .catch(() => {});
-  }, [state.isAuthenticated, state.tenantId, state.tenantName]);
+    return () => { cancelled = true; };
+  }, [state.isAuthenticated, state.tenantId]);
+
+  // Resolve the tenant display name. The BSVibe Auth `/api/session`
+  // `tenants[]` list is the source of truth for the human-readable
+  // workspace name ("BSVibe Admin"); the Gateway's own `GET /tenants/{id}`
+  // only carries a placeholder name (the tenant-id prefix). Precedence:
+  // session list → JWT/demo name → Gateway fallback.
+  const tenantName = useMemo(() => {
+    const fromSession = state.tenantId
+      ? tenants.find((tn) => tn.id === state.tenantId)?.name
+      : undefined;
+    return fromSession ?? state.tenantName ?? gatewayTenantName;
+  }, [tenants, state.tenantId, state.tenantName, gatewayTenantName]);
+
+  // Cache the resolved name so a full reload paints the right label before
+  // any network call completes (`readInitialState` reads this key).
+  useEffect(() => {
+    if (tenantName && typeof window !== 'undefined') {
+      sessionStorage.setItem(TENANT_NAME_KEY, tenantName);
+    }
+  }, [tenantName]);
 
   // Fetch tenants list (auth-app /api/session) so the workspace switcher
   // has all options for the current user. Cookie or bearer accepted.
@@ -370,5 +397,5 @@ export function useAuth({
     }
   }, [state.tenantId, probeRemoteSession]);
 
-  return { ...state, login, signup, logout, tenants, switchTenant };
+  return { ...state, tenantName, login, signup, logout, tenants, switchTenant };
 }
