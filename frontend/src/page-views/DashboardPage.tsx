@@ -271,7 +271,7 @@ export function DashboardPage() {
                   fill="url(#requestGradient)"
                   dot={{ fill: '#f59e0b', r: 3, strokeWidth: 0 }}
                   activeDot={{ fill: '#f59e0b', r: 5, strokeWidth: 0 }}
-                  name="Requests"
+                  name={t('common.requests')}
                 />
               </AreaChart>
             </ResponsiveContainer>

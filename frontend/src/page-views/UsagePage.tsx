@@ -149,7 +149,7 @@ export function UsagePage() {
                       fill="url(#usageGradient)"
                       dot={{ fill: '#f59e0b', r: 4, strokeWidth: 0 }}
                       activeDot={{ fill: '#f59e0b', r: 6, strokeWidth: 0 }}
-                      name="Requests"
+                      name={t('common.requests')}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -261,7 +261,7 @@ export function UsagePage() {
                     contentStyle={{ backgroundColor: '#1f1f24', border: '1px solid #534434', borderRadius: '12px', color: '#e3e2e8', fontSize: '12px' }}
                     cursor={{ fill: '#1f1f24' }}
                   />
-                  <Bar dataKey="requests" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Requests" />
+                  <Bar dataKey="requests" fill="#f59e0b" radius={[4, 4, 0, 0]} name={t('common.requests')} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -3,38 +3,56 @@
 import { useT } from '@bsvibe/i18n';
 
 interface HelpPageEntry {
+  /** Canonical route this entry links to (must match a real Next.js route). */
+  path: string;
   /** Translation key under `help.pages.<key>` (with `.title` and `.description`). */
   i18nKey: string;
   docLink?: string;
 }
 
-const HELP_CONTENT: Record<string, HelpPageEntry> = {
-  '/dashboard': {
-    i18nKey: 'dashboard',
-    docLink: '/bsgateway/getting-started',
-  },
-  '/rules': {
+/**
+ * Help page entries, ordered most-specific path first so that the
+ * `startsWith` match for the current page never resolves the bare `/`
+ * dashboard entry ahead of a deeper route.
+ */
+const HELP_CONTENT: readonly HelpPageEntry[] = [
+  {
+    path: '/rules',
     i18nKey: 'rules',
     docLink: '/bsgateway/features/routing',
   },
-  '/models': {
+  {
+    path: '/models',
     i18nKey: 'models',
   },
-  '/routing-test': {
+  {
+    path: '/test',
     i18nKey: 'routingTest',
   },
-  '/usage': {
+  {
+    path: '/usage',
     i18nKey: 'usage',
     docLink: '/bsgateway/features/usage',
   },
-  '/audit': {
+  {
+    path: '/audit',
     i18nKey: 'audit',
   },
-};
+  {
+    path: '/',
+    i18nKey: 'dashboard',
+    docLink: '/bsgateway/getting-started',
+  },
+];
 
-const DEFAULT_HELP: HelpPageEntry = { i18nKey: 'default' };
+const DEFAULT_HELP: HelpPageEntry = { path: '/', i18nKey: 'default' };
 
 const DOCS_BASE_URL = 'https://bsvibe.dev';
+
+/** Strip a leading `/ko` or `/en` locale segment so route matching is locale-agnostic. */
+function stripLocale(pathname: string): string {
+  return pathname.replace(/^\/(ko|en)(?=\/|$)/, '') || '/';
+}
 
 interface HelpPanelProps {
   open: boolean;
@@ -43,11 +61,13 @@ interface HelpPanelProps {
 
 export function HelpPanel({ open, onClose }: HelpPanelProps) {
   const t = useT('gateway');
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const pathname = stripLocale(
+    typeof window !== 'undefined' ? window.location.pathname : '/',
+  );
   const entry =
-    Object.entries(HELP_CONTENT).find(([path]) =>
-      pathname.startsWith(path),
-    )?.[1] ?? DEFAULT_HELP;
+    HELP_CONTENT.find((item) =>
+      item.path === '/' ? pathname === '/' : pathname.startsWith(item.path),
+    ) ?? DEFAULT_HELP;
 
   const title = t(`help.pages.${entry.i18nKey}.title`);
   const description = t(`help.pages.${entry.i18nKey}.description`);
@@ -127,20 +147,26 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
             {t('help.allPages')}
           </h3>
           <ul className="space-y-2">
-            {Object.entries(HELP_CONTENT).map(([path, item]) => (
-              <li key={path}>
-                <a
-                  href={path}
-                  className={`block min-h-11 rounded px-3 py-2.5 text-sm transition-colors ${
-                    pathname.startsWith(path)
-                      ? 'bg-amber-500/10 text-amber-500'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-gray-50'
-                  }`}
-                >
-                  {t(`help.pages.${item.i18nKey}.title`)}
-                </a>
-              </li>
-            ))}
+            {HELP_CONTENT.map((item) => {
+              const isActive =
+                item.path === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.path);
+              return (
+                <li key={item.path}>
+                  <a
+                    href={item.path}
+                    className={`block min-h-11 rounded px-3 py-2.5 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-amber-500/10 text-amber-500'
+                        : 'text-gray-300 hover:bg-gray-800 hover:text-gray-50'
+                    }`}
+                  >
+                    {t(`help.pages.${item.i18nKey}.title`)}
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

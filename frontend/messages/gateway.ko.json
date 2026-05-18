@@ -35,7 +35,8 @@
     "somethingWrong": "문제가 발생했습니다",
     "discard": "취소",
     "addExample": "예시 추가",
-    "optional": "(선택)"
+    "optional": "(선택)",
+    "requests": "요청 수"
   },
   "language": {
     "label": "언어",

@@ -35,7 +35,8 @@
     "somethingWrong": "Something went wrong",
     "discard": "Discard",
     "addExample": "Add Example",
-    "optional": "(optional)"
+    "optional": "(optional)",
+    "requests": "Requests"
   },
   "language": {
     "label": "Language",
