@@ -27,15 +27,18 @@
 
 /* Tailwind 4 source scan — pull in @bsvibe/layout's compiled JS so that
  * inline utility classes from the shared sidebar (border-l-4, min-h-[44px],
- * bg-gray-950, etc.) are present in the generated CSS. Without this the
- * library renders unstyled. */
-@source "../node_modules/@bsvibe/layout/dist/**/*.js";
+ * bg-gray-950, the md: desktop-rail variants, etc.) are present in the
+ * generated CSS. Without this the library renders unstyled — and the
+ * `md:static md:translate-x-0` desktop variants never build, so the
+ * sidebar stays a fixed mobile drawer overlapping the content at every
+ * width.
+ * NOTE: globals.css lives at app/[locale]/, so node_modules is two levels
+ * up (../../) — not one. */
+@source "../../node_modules/@bsvibe/layout/dist/**/*.js";
 /* Same rationale for @bsvibe/ui — <ResponsiveTable> ships inline utility
  * classes (hidden sm:table, overflow-x-auto, border-gray-800,
  * hover:bg-gray-900/60, …) that Tailwind 4 only emits when it can see the
- * compiled source. Without this the responsive table renders unstyled.
- * NOTE: globals.css lives at app/[locale]/, so node_modules is two levels
- * up (../../) — not one. */
+ * compiled source. Without this the responsive table renders unstyled. */
 @source "../../node_modules/@bsvibe/ui/dist/**/*.js";
 
 @theme {
